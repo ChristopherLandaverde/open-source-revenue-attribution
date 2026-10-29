@@ -109,7 +109,7 @@ These defaults make the first demo testable. Confirm them in the decision log be
 
 - Attribution is calculated per opportunity, with won revenue based on the opportunity's recorded value at the won stage.
 - Eligible touchpoints are valid marketing touchpoints connected to that opportunity's contact and occurring no later than the conversion timestamp.
-- Use a configurable lookback window, with **90 days as the initial demo default**. The window is measured backwards from the conversion timestamp.
+- ~~Use a configurable lookback window, with 90 days as the initial demo default.~~ **Updated 2026-10-29 (M4):** no lookback cap by default, as in Dreamdata (first interaction to conversion); an optional window in days is measured backwards from the conversion timestamp and shown wherever it is used. See `docs/decisions.md`.
 - First-touch and last-touch use the earliest/latest eligible touchpoint. Linear splits the opportunity value evenly across eligible touchpoints.
 - If there are no eligible touchpoints, assign the full amount to `Unattributed`.
 - Round display values to the currency's minor unit; calculate with adequate precision and assign any rounding remainder deterministically so totals reconcile.
@@ -144,7 +144,9 @@ Define the physical schema and constraints in versioned migrations after the eve
 
 - Reproducing all Dreamdata features or supporting enterprise-scale data volumes.
 - Native CRM sync, ad-spend connectors, reverse ETL, or automated ad-platform actions.
-- Machine-learning, position-based, or claimed causal/incrementality attribution.
+- Machine-learning (data-driven) or claimed causal/incrementality attribution.
+- *Updated 2026-10-29 (M4):* position-based (U-shaped) attribution moved into scope and ships
+  in M4, with time decay. W-shaped waits for a lead milestone. See `docs/decisions.md`.
 - Automated account-level identity resolution or probabilistic identity stitching.
 - Production multi-tenant SaaS guarantees, billing, and hosted operations.
 - Broad customization of every event, report, and workflow before the default funnel works end to end.

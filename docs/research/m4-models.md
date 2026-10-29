@@ -62,9 +62,9 @@ Source: [Attribution models](https://docs.hockeystack.com/documentation/reports/
 | First-touch | 100% to the earliest eligible touch | Dreamdata, HockeyStack, GA4 legacy |
 | Last-touch | 100% to the latest eligible touch | Dreamdata, HockeyStack, GA4 last click (except direct handling) |
 | Linear | equal split | Dreamdata, HockeyStack |
-| Position-based (U-shaped) | 40 / 20 / 40; one touch 100%; two touches 50 / 50 | Dreamdata U-shaped, GA4 legacy, HockeyStack (one- and two-touch cases are our reading) |
+| Position-based (U-shaped) | 40 / 20 / 40; one touch 100%; two touches 50 / 50 | Dreamdata U-shaped, GA4 legacy, HockeyStack. No vendor documents the one- and two-touch cases (HubSpot checked too); these are the only splits that keep the total and treat first and last alike. |
 | Time decay | weight 2^(−age / 7 days), age measured back from the conversion, normalised so credits sum to the amount | GA4 legacy, HockeyStack; Dreamdata has none |
-| W-shaped | **not built**: we do not store the milestone it needs | see decisions |
+| W-shaped | **deferred**: needs a lead milestone (`lead_created_at`, planned) | see decisions |
 | Data-driven | **not built** | see below |
 
 Data-driven is skipped on purpose. Dreamdata's own version falls back toward linear below 50
@@ -83,9 +83,8 @@ promise is that every number traces to source records and a named rule.
   ([attribution settings](https://support.google.com/analytics/answer/16291704)).
 - **HockeyStack:** time-based (days or months before the goal), goal-based, or none, per report
   or as a workspace default ([attribution lookback](https://docs.hockeystack.com/marketing-intelligence/reports/attribution-lookback)).
-- **Ours:** a 90-day inclusive window measured back from the conversion (PRD section 6), the
-  same for every model and for influence. It is GA4's default. Dreamdata's unbounded journey is
-  a deviation (decisions).
+- **Ours (decided):** no cap by default, as in Dreamdata. An optional window in days (90 is
+  GA4's default) applies to every model and to influence, and every page names it.
 
 ## 3. Attributed vs influenced
 
@@ -104,8 +103,8 @@ Source: [Revenue attribution](https://docs.dreamdata.io/article/8v75km9zu3-reven
   eligible touch from it. "Eligible" uses the same window as the models.
 - The column is labelled as overlapping and is never totalled.
 - Attributed columns reconcile to the amount per currency.
-- Opportunities with no eligible touch stay visible as an Unattributed row, where Dreamdata
-  would drop them as not attributable (decisions).
+- Opportunities with no eligible touch are left out of influence, as in Dreamdata. The data
+  readiness page lists them.
 
 ## 4. Data readiness
 
@@ -133,7 +132,7 @@ this):
 |---|---|
 | Opportunities have a contact | contactless deals (Dreamdata would fall back to the company; we don't, decision #3) |
 | Contacts have tracked touches | No Tracking |
-| Touches fall inside the lookback window | attributable deals |
+| Touches happen before the conversion (and inside the window, if one is set) | attributable deals |
 | Touches carry source, medium and campaign | Unknown / direct |
 | The last import loaded every row | CRM sync health |
 | Collected events were accepted | tracking status |

@@ -11,7 +11,8 @@ A self-hostable Django app for marketers, founders and agency analysts at small 
 who need a revenue report they can explain. It collects RudderStack events, imports accounts,
 contacts, opportunities and touchpoints from CSV, refuses data that breaks a
 [documented contract](docs/contract.md) with a reason code, and credits each opportunity under
-five named models and a lookback window, side by side.
+five named models, side by side. By default every touch up to the conversion counts, as in
+Dreamdata; a lookback window in days is optional.
 
 Attribution here is a reporting model. It shows how a stated rule assigns credit; it does not
 estimate causal impact or incrementality.
@@ -42,7 +43,7 @@ Open http://127.0.0.1:8000/ for the model comparison on the synthetic demo data:
 campaign under five models, each named with its rule, and the influenced amount beside them.
 Switch between **Pipeline** and **Won revenue** to swap the tables in place. Click an
 opportunity to open its journey: every touch of its contact, why each one is or isn't eligible,
-and its first-touch credit.
+and each model's credit for it.
 http://127.0.0.1:8000/readiness/ lists what to fix in the data before you trust the numbers.
 On the demo data, 3 checks need a fix. Each one comes with its fix and a way to verify it.
 http://127.0.0.1:8000/validation/ shows what the import refused and why: the demo data has 10
@@ -90,13 +91,13 @@ The Postgres path has not been run end to end yet; tests and the steps above use
 | Validation report | `/validation/`: verdict, counts per file, every refused row and warning with its code and how to fix it | Works |
 | Event collection | `POST /v1/batch`, `/v1/page`, `/v1/track`, `/v1/identify` with a per-workspace write key. Validated, deduplicated on `messageId`, raw payload and outcome stored. | Works |
 | Events to touchpoints | An identify links the browser's earlier anonymous page views to the contact. Each session (a browser's events less than 30 minutes apart, as in Dreamdata and GA4) is one touchpoint, credited to its first page view's UTMs or referrer; later page views in the session are not counted again. Browser clock skew corrected with receive time minus `sentAt`. | Works |
-| Opportunity journey | `/opportunities/<id>/journey/`: each touch of the opportunity's contact in a fixed order, its lookback status, the session rule that admitted it with the session's page views nested under it, and its first-touch credit | Works |
-| Model comparison | `/`: first-touch, last-touch, linear, position-based (U-shaped, 40/20/40) and time decay (7-day half-life) side by side per campaign and per opportunity. Pipeline (at creation) and won revenue (at close), 90-day lookback, totals per currency. Every model column sums to the amount, with leftover cents assigned deterministically. | Works |
-| Attributed vs influenced | An Influenced column beside the models: the full amount of every opportunity a campaign touched, labelled as overlapping and never totalled (Dreamdata's definition) | Works |
+| Opportunity journey | `/opportunities/<id>/journey/`: each touch of the opportunity's contact in a fixed order, its lookback status, the session rule that admitted it with the session's page views nested under it, and the credit each model gives it | Works |
+| Model comparison | `/`: first-touch, last-touch, linear, position-based (U-shaped, 40/20/40) and time decay (7-day half-life) side by side per campaign and per opportunity. Pipeline (at creation) and won revenue (at close), no lookback cap by default (optional `ATTRIBUTION_LOOKBACK_DAYS`), totals per currency. Every model column sums to the amount, with leftover cents assigned deterministically. | Works |
+| Attributed vs influenced | An Influenced column beside the models: the full amount of every opportunity a campaign touched, labelled as overlapping and never totalled. Opportunities with no eligible touch are left out and listed on the readiness page (Dreamdata's definition). | Works |
 | Data readiness | `/readiness/`: 7 checks with denominators (contacts, tracked touches, touches in the window, campaign fields, refused import rows, refused events, unlinked page views). Each failing check comes with its fix, a way to verify it, and the affected records. Checks without data show "Not checked". | Works |
 | Demo fixtures | Synthetic CSVs and events with hand-calculated expected results ([sample_data/](sample_data/)) | Works |
 | Combined account journey, stage history | | Planned |
-| W-shaped model (needs a lead milestone), journeys under every model | | Planned |
+| W-shaped model (needs a planned `lead_created_at` lead milestone in the contract) | | Planned |
 | Self-hosting guide, release | | Planned (M5) |
 
 ## Known limits
@@ -104,10 +105,8 @@ The Postgres path has not been run end to end yet; tests and the steps above use
 - **Rule-based models only.** No data-driven model: it needs volume and can't be checked by
   hand. No W-shaped model yet. Model definitions and their sources:
   [docs/research/m4-models.md](docs/research/m4-models.md).
-- **The window is fixed at 90 days** (GA4's default). Dreamdata counts from the first
-  interaction instead, so long journeys show more Unattributed here.
-- **Journeys show first-touch credit.** The other models' per-touch credit is in the
-  comparison's "Credit by opportunity" table.
+- **Time decay is not a Dreamdata model.** It follows GA4's legacy model and HockeyStack
+  (7-day half-life), and the page says so.
 - **No login.** Every page, including CSV upload, is open to anyone who can reach the server.
   Run it locally or behind your own access control.
 - **Same-origin collection only.** The endpoint sends no CORS headers, so a site on another

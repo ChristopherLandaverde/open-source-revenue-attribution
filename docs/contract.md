@@ -61,6 +61,11 @@ Validated in this order (parents first): `accounts.csv`, `contacts.csv`, `opport
 | `created_at` | yes | timestamp | Pipeline conversion time. |
 | `won_at` | if won | timestamp | Required when `stage` is `won` (`WON_AT_REQUIRED`), must be blank when `open` (`WON_AT_NOT_ALLOWED`), not before `created_at` (`WON_BEFORE_CREATED`). Won-revenue conversion time. |
 
+**Planned, not implemented:** a `lead_created_at` timestamp (on `contacts.csv` or from an
+identify/track milestone). It is the third anchor W-shaped needs ("the touch containing the
+conversion", Dreamdata). Today the column is not read; an unknown column is warned and ignored
+(assumption 11). See [decisions](decisions.md), 2026-10-29 M4.
+
 ### touchpoints.csv
 
 A touchpoint is a marketing touch (typically a landing-page visit) by a known contact.
@@ -274,7 +279,7 @@ With `--strict` any refusal refuses the whole import and nothing is loaded.
 | `UNKNOWN_COLUMN` | A column is not in the contract and was ignored. |
 | `DUPLICATE_ROW` | An exact repeat of an earlier row or event; counted once. |
 | `MISSING_CAMPAIGN_FIELDS` | `utm_source`, `utm_medium` or `utm_campaign` is blank; shown as `(none)`. |
-| `TOUCHPOINT_OUTSIDE_LOOKBACK` | The touchpoint is outside every lookback window (pipeline and won) of its contact's opportunities, or the contact has no opportunities, so no model can credit it. |
+| `TOUCHPOINT_OUTSIDE_LOOKBACK` | The touchpoint is outside every lookback window (pipeline and won) of its contact's opportunities, or the contact has no opportunities, so no model can credit it. With no lookback cap (the default), that means it happened after every conversion of the contact. |
 | `OPPORTUNITY_WITHOUT_CONTACT` | No contact, so no touchpoints: the full amount is Unattributed. |
 | `ZERO_AMOUNT` | The opportunity amount is 0. |
 | `UNKNOWN_EVENT_NAME` | A track event name is not a funnel milestone. |
@@ -285,8 +290,10 @@ With `--strict` any refusal refuses the whole import and nothing is loaded.
 - One conversion per opportunity per metric: **pipeline** at `created_at`, **won revenue** at
   `won_at` for won opportunities only ([decisions](decisions.md)).
 - Eligible touchpoints: the opportunity contact's touchpoints with
-  `conversion − lookback ≤ occurred_at ≤ conversion`, both ends inclusive, compared in UTC.
-  Lookback defaults to 90 days (`ATTRIBUTION_LOOKBACK_DAYS`).
+  `occurred_at ≤ conversion`, compared in UTC. **No lookback cap by default**: the journey runs
+  from the first interaction to the conversion, as in Dreamdata. An optional cap
+  (`ATTRIBUTION_LOOKBACK_DAYS`, for example 90, GA4's default) adds
+  `conversion − lookback ≤ occurred_at`, inclusive, and every page names it.
 - Same-instant touchpoints are ordered by touchpoint ID.
 - No eligible touchpoints → the whole amount goes to `Unattributed`.
 - **Models (M4):** first-touch, last-touch, linear, position-based (U-shaped, 40/20/40) and
@@ -297,6 +304,8 @@ With `--strict` any refusal refuses the whole import and nothing is loaded.
   to the amount.
 - **Influenced (M4):** a campaign's influenced amount is the full amount of each opportunity
   with at least one eligible touch from it. It overlaps across campaigns and is never summed.
+  Opportunities with no eligible touch are left out of influence (Dreamdata's "attributable
+  deals"); the data readiness page lists them.
 - Sources and deviations: [research](research/m4-models.md), [decisions](decisions.md).
 
 ## Assumptions
@@ -333,7 +342,7 @@ Choices the PRD does not make, taken conservatively. Each is a candidate for
     refuses everything on any error.
 13. **Track names outside the four milestones are accepted** with a warning, not refused.
 14. **`TOUCHPOINT_OUTSIDE_LOOKBACK` checks both the pipeline and the won window**, using the
-    configured lookback.
+    configured lookback (none by default since M4).
 15. **Supported currencies** are the 20 listed above (all with 0 or 2 minor-unit digits, to fit
     the current amount column).
 

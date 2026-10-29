@@ -2,51 +2,53 @@
 
 Product and data-meaning decisions, newest first. Each links the issue where it was made.
 
-## 2026-10-29 — M4 models, influence and readiness (proposed, needs Christopher)
+## 2026-10-29 — M4 models, lookback, influence and readiness
 
-Proposed on branch `claude/m4-models`, not yet reviewed. Research and sources:
-[docs/research/m4-models.md](research/m4-models.md).
+Decided by Claude (the coordinating session), under Christopher's standing rule for this
+project: adopt the industry standard, or argue for a deviation from the docs. Research and
+sources: [docs/research/m4-models.md](research/m4-models.md). Branch `claude/m4-models`.
 
-**Adopted from the standard:**
-- **Models:** first-touch, last-touch and linear as Dreamdata defines them. Position-based
-  (U-shaped) is 40/20/40, as in Dreamdata, GA4 (legacy) and HockeyStack. Time decay has a
-  7-day half-life measured back from the conversion, as in GA4 (legacy) and HockeyStack.
-- **Influenced:** a campaign counts the full amount of every opportunity it touched, so
-  totals overlap (Dreamdata's definition). It is never totalled in the UI.
-- **Direct and `(none)` touches** get credit like any other, as in Dreamdata. GA4 excludes
-  direct; we don't.
-- **Rounding:** every model splits at the currency's minor unit. Leftover minor units go to
-  the largest remainders, ties to the earlier touch (PRD section 6: deterministic,
-  reconciling).
+1. **No lookback cap by default (matches Dreamdata).** Dreamdata counts "from the first
+   interaction up to the stage you selected". A day-based window is now an optional model
+   parameter (`ATTRIBUTION_LOOKBACK_DAYS`, for example 90, GA4's default). Every page names
+   the window in use. This replaces the PRD's 90-day demo default.
+   **Numbers that moved on the demo** (hand-derived in `sample_data/demo/README.md`):
+   - Pipeline first-touch: opp-105 moves to tp-11 (google / cpc / q4-search) and opp-106 to
+     tp-15 (google / cpc / q1-search-jp).
+   - Won first-touch: opp-101 moves to tp-01 (q1-search) and opp-105 to tp-11.
+   - Every multi-touch model for opp-105 (both metrics), opp-106 pipeline and opp-101 won.
+   - Two fewer `TOUCHPOINT_OUTSIDE_LOOKBACK` warnings (tp-11, tp-15) on the live import.
+   - The 90-day results stay in each expected file under `lookback_90`.
+2. **W-shaped deferred.** Its third anchor is "the touch containing the conversion", which
+   needs a lead milestone. `lead_created_at` is listed in the contract as planned, not
+   implemented.
+3. **Time decay kept.** Its 7-day half-life is measured back from the conversion, per GA4
+   (legacy) and HockeyStack. The UI labels those sources and says that Dreamdata has no
+   time-decay model. Weights are normalised so credits reconcile.
+4. **Position-based with one or two touches: 100%, or 50/50.** No vendor documents these
+   cases (checked Dreamdata, GA4, HockeyStack and HubSpot). They are the only splits that
+   keep the total and treat first and last alike.
+5. **Influenced matches Dreamdata.** A campaign counts the full amount of every opportunity it
+   touched, so totals overlap and are never summed. Opportunities with no eligible touch are
+   left out ("attributable deals" only). The readiness page lists them instead.
+6. **PRD updated.** Position-based is in scope for M4 (PRD section 9, dated note).
+7. **Journeys show every model's credit per touch**, not first-touch only.
 
-**Deviations, each needing a `Decision:`:**
-1. **Lookback stays 90 days.** Dreamdata has no fixed window: it counts from the first
-   interaction up to the stage date. GA4 defaults to 90 days. Long journeys will show less
-   credit (more Unattributed) here than in Dreamdata. Alternative: an "unbounded" option.
-2. **W-shaped is not built.** Its third 30% anchor is "the touch containing the conversion",
-   which needs a lead or conversion milestone we don't store. Dreamdata doesn't define which
-   milestone it is. Options: contact creation time, a `track` milestone event such as
-   `Demo Requested`, or wait for stage history.
-3. **Time decay is included although Dreamdata has none.** The M4 brief asked for it, and GA4
-   (legacy) and HockeyStack define it. Weights are normalised so credits reconcile.
-   HockeyStack notes its version doesn't add up.
-4. **Position-based with one or two touches** gives 100%, or 50/50. No source documents
-   these cases; this is the common reading.
-5. **Influence keeps an Unattributed row** for opportunities with no eligible touch.
-   Dreamdata leaves those deals out ("attributable deals" only). We keep them because the
-   PRD says missing attribution must stay visible.
-6. **PRD section 9 lists position-based as out of scope** for the first release. The M4 brief
-   asks for it. The PRD needs updating if this stands.
-7. **Data-driven is skipped.** Dreamdata's version falls back toward linear below 50
-   journeys, and a removal-effect credit can't be checked by hand per opportunity.
+**Also adopted from the standard:**
+- First-touch, last-touch, linear and U-shaped 40/20/40, as in Dreamdata.
+- Direct and `(none)` touches get credit, as in Dreamdata (GA4 excludes direct).
+- Data-driven is skipped: Dreamdata's version falls back toward linear below 50 journeys, and
+  its credit can't be checked by hand.
+- Rounding happens at the currency's minor unit; leftover units go to the largest
+  remainders, ties to the earlier touch.
 
 **Data readiness:** seven counted checks with denominators. Each check has a fix and a way to
-verify it, and shows "Not checked" with the reason when its data is missing. The checks map to
-Dreamdata's No tracking, Unknown and attributable-deals labels (research §4). Implemented in
-`reports/readiness.py`.
+verify it, and shows "Not checked" with the reason when its data is missing. They map to
+Dreamdata's No tracking, Unknown and attributable-deals labels.
 
-Implemented in `attribution/models.py`, `attribution/influence.py` and
-`attribution/types.allocate`. Fixture: `sample_data/demo/expected/models.json`.
+Code: `attribution/models.py`, `attribution/influence.py`, `attribution/types.py`
+(`allocate`, `describe_window`), `reports/readiness.py`. Fixtures:
+`sample_data/demo/expected/models.json` and `first_touch.json`.
 
 ## 2026-10-29 — One touchpoint per session (replaces assumption 17's visit rule)
 
