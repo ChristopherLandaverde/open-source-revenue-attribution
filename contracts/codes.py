@@ -81,3 +81,8 @@ class WarningCode(_Described):
         "UNKNOWN_EVENT_NAME",
         "A track event name is not one of the funnel milestones; kept but not a milestone.",
     )
+    CLOCK_SKEW_NOT_CORRECTED = (
+        "CLOCK_SKEW_NOT_CORRECTED",
+        "No usable sentAt or receive time, so the event time is the browser clock "
+        "(originalTimestamp), not corrected for clock skew.",
+    )

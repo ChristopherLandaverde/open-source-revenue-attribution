@@ -9,6 +9,7 @@ estimate causal impact or incrementality.
 """
 
 from attribution.first_touch import FirstTouch
+from attribution.journey import Eligibility, Journey, JourneyStep, build_journey
 from attribution.types import (
     DEFAULT_LOOKBACK_DAYS,
     UNATTRIBUTED,
@@ -26,8 +27,12 @@ __all__ = [
     "AttributionModel",
     "Conversion",
     "Credit",
+    "Eligibility",
     "FirstTouch",
+    "Journey",
+    "JourneyStep",
     "Touchpoint",
+    "build_journey",
     "eligible_touchpoints",
     "summarize_by_campaign",
 ]

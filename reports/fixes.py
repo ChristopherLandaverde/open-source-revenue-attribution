@@ -37,4 +37,5 @@ FIXES: dict[str, str] = {
     W.OPPORTUNITY_WITHOUT_CONTACT: "Add the opportunity's contact_id to credit its touchpoints.",
     W.ZERO_AMOUNT: "Enter the deal amount if it is known.",
     W.UNKNOWN_EVENT_NAME: "Use a funnel milestone name if this event is a milestone.",
+    W.CLOCK_SKEW_NOT_CORRECTED: "Send sentAt with a UTC offset (the RudderStack SDK does).",
 }

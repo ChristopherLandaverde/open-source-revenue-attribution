@@ -105,7 +105,8 @@ account 1──* contact 1──* touchpoint
 
 Attribution is per opportunity and uses the touchpoints of **the opportunity's contact**
 (PRD §6). Other contacts at the same account, and account-level activity, are not credited in
-v1; the account journey is M3.
+v1. The opportunity journey lists the account's other contacts as not credited; a combined
+account journey with drill-down (PRD) is not built yet.
 
 ## 3. Events (RudderStack)
 
@@ -124,16 +125,26 @@ event must carry to be accepted. Field names are RudderStack's.
 | `timestamp` (else `originalTimestamp`) | required | required | required | Must carry a UTC offset. |
 | `context.campaign.source/medium/name/content/term` | optional | optional | — | Mapped to `utm_source/utm_medium/utm_campaign/utm_content/utm_term`. A page event with any of the first three blank gets `MISSING_CAMPAIGN_FIELDS`. |
 
-- **Event time** is RudderStack's `timestamp` (the client time corrected for clock skew
-  against the server). `originalTimestamp` is preserved verbatim and used only when
-  `timestamp` is absent.
+- **Event time** ([decision #5](decisions.md)), in order of preference:
+  1. `timestamp`, when sent: a RudderStack server already corrected it. Used as is.
+  2. Otherwise `originalTimestamp + (receivedAt − sentAt)`, RudderStack's own rule:
+     `receivedAt` is when this server received the request, so `receivedAt − sentAt` is the
+     browser clock's error (plus network latency, as in RudderStack).
+  3. Otherwise (no `sentAt`, `sentAt` without a UTC offset or not ISO 8601, or no receive
+     time) `originalTimestamp` as the browser sent it, with a `CLOCK_SKEW_NOT_CORRECTED`
+     warning. A bad `sentAt` never refuses an event: it is transport metadata.
+
+  `originalTimestamp` and `sentAt` are preserved verbatim; the stored event records which of
+  the three rules gave its time (`time_source`). A retry keeps the first delivery's time.
 - **Campaign values** come only from `context.campaign`, which the SDK fills from the landing
   URL's UTM parameters. They are not re-parsed from the URL or guessed from the referrer.
 - **Funnel milestones** are the track names `Demo Requested`, `Lead Qualified`,
   `Opportunity Created`, `Opportunity Won`. Other track names are accepted with
   `UNKNOWN_EVENT_NAME` and are not milestones.
-- **Identity:** browsing stays anonymous (`anonymousId` only) until an identify event sends
-  `userId` = `contact_id`. Nothing else links anonymous activity to a contact.
+- **Identity:** browsing is anonymous (`anonymousId` only) until an identify event sends
+  `userId` = `contact_id`. The identify then links that browser's **earlier** anonymous page
+  views to the contact (see [From events to touchpoints](#from-events-to-touchpoints)).
+  Nothing else links anonymous activity to a contact.
 - **Retries:** a repeat of an already-accepted `messageId` with identical content is counted
   once (`DUPLICATE_ROW`), whether it arrives in the same request or a later one. The same
   `messageId` with different content is refused (`DUPLICATE_ID`); the first accepted event
@@ -143,8 +154,7 @@ event must carry to be accepted. Field names are RudderStack's.
   page URL and referrer ≤ 500 (`VALUE_TOO_LONG`).
 - **Browser time:** the browser SDK sends `originalTimestamp` (the visitor's clock) and
   `sentAt`, not `timestamp`; RudderStack's server normally adds `timestamp`. Events collected
-  directly from the SDK therefore use `originalTimestamp`. `sentAt` and the receive time are
-  stored so a skew correction can be added later.
+  directly from the SDK are therefore skew-corrected here (rule 2 above).
 
 ### Collection endpoint
 
@@ -158,19 +168,58 @@ event must carry to be accepted. Field names are RudderStack's.
 
 ### From events to touchpoints
 
-`contracts/touchpoints.py` turns accepted events into touchpoints, deterministically:
+`contracts/touchpoints.py` turns accepted events into touchpoints, deterministically, in three
+steps ([decision #5](decisions.md)).
+
+**1. Whose page view is it?**
+
+| Page view | Contact |
+|---|---|
+| carries `userId` | That `userId`. |
+| anonymous, and an identify with the same `anonymousId` happens **at or after** it | The identify's `userId` (*stitched*; the touchpoint records the `anonymousId`). This is how the landing visit that carried the UTMs reaches the contact. |
+| anonymous, with no identify of its `anonymousId` at or after it | Nobody (`ANONYMOUS`). |
+| anonymous, and its `anonymousId` was identified as **two or more different** contacts | Nobody (`AMBIGUOUS_IDENTITY`): a shared browser; we can't tell whose visit it was. |
+| its contact is not an imported `contact_id` | Nobody yet (`CONTACT_NOT_IMPORTED`). It converts after the import that adds the contact. |
+
+Only identify events link an `anonymousId` to a contact, and only backwards in time.
+
+**2. Visits.** Each contact's page views (identified and stitched, across devices) are taken
+in time order, ties by `messageId`. A page view **starts a visit** when:
+
+| Rule | Code |
+|---|---|
+| it is the contact's first page view | `FIRST_VISIT` |
+| more than 30 minutes passed since the contact's previous page view (exactly 30:00 is the same visit) | `INACTIVITY` |
+| it carries campaign data (`utm_source`, `utm_medium` or `utm_campaign`) different from the current visit's | `NEW_CAMPAIGN` |
+| it arrives from another site: the referrer's host differs from the page's host (a leading `www.` is ignored) and from the referrer host that opened the current visit | `NEW_REFERRER` |
+
+Track and identify events do not extend a visit. A reload keeps the same referrer, so it does
+not start a visit.
+
+**3. Touchpoints.** A page view is a touchpoint when it starts a visit, or when it carries
+campaign data inside the current visit (`CAMPAIGN_DATA`). Every other page view is internal
+navigation (`INTERNAL_NAVIGATION`): kept and shown in the journey, never credited.
 
 | Event | Becomes |
 |---|---|
-| `page` with `userId` that is an imported `contact_id` | One touchpoint. ID = `messageId`, time = event time, UTMs from `context.campaign` (blank stays blank), `landing_page` = page URL, `referrer` as sent. |
-| `page` with no `userId` | Nothing (`ANONYMOUS`). Earlier anonymous page views are **not** linked to a contact by a later identify. |
-| `page` whose `userId` is not an imported contact | Nothing yet (`CONTACT_NOT_IMPORTED`). It converts after the import that adds the contact. |
-| `track`, `identify` | Nothing (`NOT_A_PAGE_VIEW`). Kept for the funnel (M3). |
+| `page` that passes 1–3 | One touchpoint. ID = `messageId`, time = event time, UTMs from `context.campaign` (blank stays blank), `landing_page` = page URL, `referrer` as sent, plus `stitched_from` and `visit_rule`. |
+| `page` that fails 1 or 3 | Nothing, with the reason code above. |
+| `track`, `identify` | Nothing (`NOT_A_PAGE_VIEW`). Kept for the funnel. |
 
-There is no sessionisation: every identified page view is a touchpoint, including internal
-page views without UTMs (shown as `(none)`). Touchpoints from events are stored with
-`origin = event` next to CSV touchpoints, and re-running the conversion updates them in place.
-The hand-calculated fixture is `sample_data/events/`.
+Touchpoints from events are stored with `origin = event` next to CSV touchpoints. They are
+recomputed from every accepted event after each collection request and each import, because a
+later identify or page view can change earlier decisions; page views that no longer qualify
+lose their touchpoint. CSV touchpoints are counted as given: the visit rules apply to events
+only. The hand-calculated fixture is `sample_data/events/`.
+
+### Journeys
+
+Each opportunity has a journey (`attribution/journey.py`, page `/opportunities/<id>/journey/`):
+every touchpoint of **the opportunity's contact** (never other contacts at the account), in
+the order `(occurred_at, touchpoint ID)`, with equal pairs kept in a fixed source order (CSV
+before event). Each touch is `eligible`, `before_window` or `after_conversion` under the rule in
+section 5, and carries the credit the named model gives it; the contact's internal-navigation
+page views are listed as not touchpoints. Credits plus Unattributed equal the amount.
 
 ## 4. Validation report
 
@@ -221,6 +270,7 @@ With `--strict` any refusal refuses the whole import and nothing is loaded.
 | `OPPORTUNITY_WITHOUT_CONTACT` | No contact, so no touchpoints: the full amount is Unattributed. |
 | `ZERO_AMOUNT` | The opportunity amount is 0. |
 | `UNKNOWN_EVENT_NAME` | A track event name is not a funnel milestone. |
+| `CLOCK_SKEW_NOT_CORRECTED` | No usable `sentAt` or receive time, so the event time is the browser clock (`originalTimestamp`), not corrected for skew. |
 
 ## 5. How the contract feeds attribution
 
@@ -270,27 +320,31 @@ Choices the PRD does not make, taken conservatively. Each is a candidate for
 15. **Supported currencies** are the 20 listed above (all with 0 or 2 minor-unit digits, to fit
     the current amount column).
 
-### M2 assumptions (not yet reviewed)
+### M2 assumptions
 
-Taken during M2 where the contract was silent. Each changes what data means and needs
-Christopher's decision before it is treated as settled.
+Taken during M2 where the contract was silent, then decided by Christopher in
+[#5](decisions.md) (2026-10-29).
 
-16. **Only identified page views become touchpoints.** An identify does not retroactively link
-    earlier anonymous page views (the landing visit that carried the UTMs is lost if the visitor
-    identifies later). Retroactive stitching by `anonymousId` is a candidate for M3.
-17. **Every identified page view is a touchpoint** (no sessionisation), including internal
-    navigation without UTMs. This adds `(none) / (none) / (none)` touches that first-touch
-    can credit.
-18. **`sentAt` is transport metadata**, ignored when deciding whether a repeat is a retry.
-19. **Direct SDK events use the browser clock** (`originalTimestamp`), because the SDK sends no
-    `timestamp`; no skew correction is applied.
-20. **Refused events get HTTP 200** with per-event outcomes, not 4xx, so one bad event does not
-    fail a batch.
-21. **One dataset for all workspaces**; `messageId` deduplication is global.
+16. **Decided: an identify stitches earlier anonymous page views** with the same
+    `anonymousId` to its contact, so the landing visit that carried the UTMs reaches the
+    contact. *M3 implementation choices:* only identify events link; only views at or before
+    the identify; an `anonymousId` identified as more than one contact links to nobody.
+17. **Decided: only page views that start a visit, or carry campaign data, are touchpoints.**
+    Internal navigation is not. *M3 implementation choices:* visits are per contact; a new
+    visit after more than 30 minutes of inactivity, a new campaign or a new external referrer
+    host; campaign-carrying views inside a visit still count.
+18. **Decided: `sentAt` is transport metadata**, ignored when deciding whether a repeat is a
+    retry.
+19. **Decided: browser events are corrected for clock skew** with
+    `originalTimestamp + (receivedAt − sentAt)`, as RudderStack does. Without a usable
+    `sentAt` the browser clock is used, with a `CLOCK_SKEW_NOT_CORRECTED` warning.
+20. **Decided: refused events get HTTP 200** with per-event outcomes, not 4xx, so one bad event
+    does not fail a batch.
+21. **Decided: one dataset for all workspaces**; `messageId` deduplication is global.
 
 ## Not in v1
 
-Sessionisation of page events, linking anonymous history on identify, CORS for cross-site
-collection, per-workspace data isolation, account-level touchpoints, stage history and
-`lost`/custom stages, currency conversion, import provenance beyond the `ImportRun` record,
+Linking anonymous history by anything other than identify (no fingerprinting, no
+probabilistic matching), a combined account journey, CORS for cross-site collection,
+per-workspace data isolation, account-level touchpoints, stage history and `lost`/custom stages, currency conversion, import provenance beyond the `ImportRun` record,
 and deleting records that disappear from a re-import.

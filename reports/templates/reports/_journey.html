@@ -1,0 +1,102 @@
+{% load money %}{% with opp=view.opportunity journey=view.journey %}<section id="results" aria-live="polite">
+  {% if not journey %}
+    <p class="verdict"><span class="tag tag-neutral">– Not won</span> {{ opp.name|default:opp.external_id }} is still open, so it has no won-revenue journey.</p>
+    <p>Switch to <a href="{% url 'reports:journey' opp.external_id %}?metric=pipeline">pipeline</a> to see the journey to its creation.</p>
+  {% else %}
+    {% with step=journey.credited_step amount=opp.amount|minor_unit:opp.currency %}
+    {% if step %}
+      <p class="verdict"><span class="tag tag-accepted">✓ Credited</span>
+        {{ view.model_name }} gives the full {{ amount }} {{ opp.currency }} to <span class="mono">{{ step.touchpoint.id }}</span>
+        (<span class="mono">{{ step.touchpoint.campaign_key }}</span>).</p>
+      <p class="context">{% if view.eligible_count == 1 %}It is the only eligible touch in the window.{% else %}It is the earliest of {{ view.eligible_count }} eligible touches in the window.{% endif %}</p>
+    {% elif not opp.contact %}
+      <p class="verdict"><span class="tag tag-review">! Unattributed</span>
+        No contact on this opportunity, so the full {{ amount }} {{ opp.currency }} is Unattributed.</p>
+      <p class="context">Add its <code>contact_id</code> to opportunities.csv and re-import to credit that contact's touches.</p>
+    {% elif not view.rows %}
+      <p class="verdict"><span class="tag tag-review">! Unattributed</span>
+        <span class="mono">{{ opp.contact.external_id }}</span> has no touches, so the full {{ amount }} {{ opp.currency }} is Unattributed.</p>
+      <p class="context">Import touchpoints.csv rows or send page events for this contact.</p>
+    {% else %}
+      <p class="verdict"><span class="tag tag-review">! Unattributed</span>
+        No touch of <span class="mono">{{ opp.contact.external_id }}</span> is in the {{ view.lookback_days }}-day window, so the full {{ amount }} {{ opp.currency }} is Unattributed.</p>
+      <p class="context">Touches outside the window are listed below with the reason.</p>
+    {% endif %}
+    {% endwith %}
+
+    <h2>Audit chain</h2>
+    <dl class="codes">
+      <dt class="label">Opportunity</dt>
+      <dd><span class="mono">{{ opp.external_id }}</span> · {{ opp.get_stage_display }} · <span class="mono">{{ opp.amount|minor_unit:opp.currency }} {{ opp.currency }}</span></dd>
+      <dt class="label">Account</dt>
+      <dd>{{ opp.account.name|default:opp.account.external_id }} (<span class="mono">{{ opp.account.external_id }}</span>), linked by explicit <code>account_id</code></dd>
+      <dt class="label">Contact</dt>
+      <dd>{% if opp.contact %}<span class="mono">{{ opp.contact.external_id }}</span>, the opportunity's <code>contact_id</code>; only this contact's touches count{% else %}None{% endif %}</dd>
+      <dt class="label">Conversion</dt>
+      <dd><span class="mono">{{ journey.conversion.converted_at|date:"Y-m-d H:i" }} UTC</span> · {{ view.metric_label }}</dd>
+      <dt class="label">Window</dt>
+      <dd><span class="mono">{{ journey.window_start|date:"Y-m-d H:i" }} → {{ journey.conversion.converted_at|date:"Y-m-d H:i" }} UTC</span>: {{ view.lookback_days }} days, both ends included</dd>
+      <dt class="label">Model</dt>
+      <dd>{{ view.model_name }}: the earliest eligible touch gets the full amount; ties on time go to the lower touch ID</dd>
+    </dl>
+
+    {% if view.rows %}
+    <h2>Touches of <span class="mono">{{ opp.contact.external_id }}</span> <span class="muted">(oldest first)</span></h2>
+    <div class="table-wrap">
+    <table class="journey-table">
+      <thead><tr>
+        <th scope="col" class="num">#</th><th scope="col">Time (UTC)</th><th scope="col">Touch</th>
+        <th scope="col">Source / medium / campaign</th><th scope="col">How it became a touch</th>
+        <th scope="col">Lookback</th><th scope="col" class="num">Credit ({{ opp.currency }})</th>
+      </tr></thead>
+      <tbody>
+      {% for row in view.rows %}
+        <tr>
+          <td class="num">{{ row.position|default:"—" }}</td>
+          <td class="mono">{{ row.occurred_at|date:"Y-m-d H:i:s" }}</td>
+          <td><span class="mono nowrap">{{ row.touchpoint_id }}</span><br><span class="small muted">{% if row.origin == "csv" %}touchpoints.csv{% else %}page event{% endif %}</span></td>
+          <td><span class="mono">{{ row.campaign_key }}</span>{% if row.landing_page %}<br><span class="small muted mono">{{ row.landing_page|truncatechars:60 }}</span>{% endif %}</td>
+          <td>{{ row.how }}{% if row.stitched_from %}<br><span class="small">Anonymous view, linked by an identify of <span class="mono">{{ row.stitched_from }}</span>.</span>{% endif %}</td>
+          <td><span class="tag {{ row.status_class }}">{{ row.status_label }}</span><br><span class="small">{{ row.window_text }}</span></td>
+          <td class="num">{% if row.credit is None %}—{% else %}{{ row.credit|minor_unit:opp.currency }}{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        {% if journey.unattributed %}
+        <tr><th scope="row" colspan="6">Unattributed</th><td class="num">{{ journey.unattributed|minor_unit:opp.currency }}</td></tr>
+        {% endif %}
+        <tr><th scope="row" colspan="6">Total, equal to the opportunity amount</th><td class="num">{{ opp.amount|minor_unit:opp.currency }}</td></tr>
+      </tfoot>
+    </table>
+    </div>
+    {% elif opp.contact %}
+    <div class="empty">
+      <p><strong>No touches recorded for <span class="mono">{{ opp.contact.external_id }}</span>.</strong></p>
+      <p>Import touchpoints.csv rows or send page events with this <code>userId</code>.</p>
+    </div>
+    {% endif %}
+  {% endif %}
+
+  {% if view.other_contacts %}
+  <h2>Other contacts at {{ opp.account.name|default:opp.account.external_id }} <span class="muted">(not credited)</span></h2>
+  <p class="context">Credit uses only the opportunity's own contact, never colleagues' touches (contract section 5).</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th scope="col">Contact</th><th scope="col" class="num">Touchpoints</th></tr></thead>
+    <tbody>
+    {% for contact_id, count in view.other_contacts %}
+      <tr><td class="mono">{{ contact_id }}</td><td class="num">{{ count }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
+  <h2>Rules used</h2>
+  <dl class="codes small">
+    <dt class="label">Visits</dt><dd>A page view starts a visit when it is the contact's first, comes over 30 minutes after the previous one, carries a new campaign, or arrives from another site. Visit starts and views with campaign data are touches; the rest is internal navigation.</dd>
+    <dt class="label">Identity</dt><dd>An identify links earlier anonymous views of the same <code>anonymousId</code> to its contact. A browser identified as two contacts links to neither.</dd>
+    <dt class="label">Time</dt><dd>Event time is corrected for the browser's clock error: receive time minus <code>sentAt</code>.</dd>
+  </dl>
+</section>{% endwith %}

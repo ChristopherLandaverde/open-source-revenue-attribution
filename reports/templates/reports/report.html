@@ -8,7 +8,7 @@
   not causal impact: it does not show that a campaign caused a deal.
 </p>
 
-<form class="controls" hx-get="{% url 'reports:report' %}" hx-target="#results" hx-swap="outerHTML"
+<form class="controls" hx-get="{% url 'reports:report' %}" hx-target="#results" hx-indicator="#results" hx-swap="outerHTML"
       hx-trigger="change" hx-push-url="true">
   <fieldset>
     <legend>Amount to attribute</legend>

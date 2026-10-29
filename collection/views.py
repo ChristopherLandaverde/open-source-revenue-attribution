@@ -20,10 +20,19 @@ from reports.models import Touchpoint
 DEMO_CONTACT = "con-nw-li"  # a demo-fixture contact with no opportunities, so reports don't move
 SKIP_TEXT = {
     SkipReason.NOT_A_PAGE_VIEW: "Track and identify events are kept, but are not touchpoints.",
-    SkipReason.ANONYMOUS: "No userId on this page view. Earlier anonymous views are not linked.",
+    SkipReason.ANONYMOUS: "No userId, and no later identify of this anonymousId.",
     SkipReason.CONTACT_NOT_IMPORTED: (
         "userId is not an imported contact_id. Import the contact; it converts then."
     ),
+    SkipReason.INTERNAL_NAVIGATION: "Same visit and no campaign data: internal navigation.",
+    SkipReason.AMBIGUOUS_IDENTITY: (
+        "This anonymousId was identified as more than one contact, so it is not linked."
+    ),
+}
+TIME_TEXT = {
+    "timestamp": "server timestamp",
+    "skew_corrected": "skew-corrected",
+    "original_timestamp": "browser clock",
 }
 SINGLE_EVENT_PATHS = ("page", "track", "identify", "screen", "group", "alias")
 
@@ -100,12 +109,14 @@ def events(request):
     rejected = rows.filter(status=CollectedEvent.Status.REJECTED)
     conversion = convert_events()
     skipped = dict(conversion.skipped)
-    touchpoint_ids = {tp.touchpoint_id for tp in conversion.touchpoints}
+    touchpoints = {tp.touchpoint_id: tp for tp in conversion.touchpoints}
     recent = list(accepted.order_by("-occurred_at", "-message_id")[:50])
     for row in recent:
-        in_touchpoints = row.message_id in touchpoint_ids
-        row.became = "touchpoint" if in_touchpoints else skipped.get(row.message_id)
+        touchpoint = touchpoints.get(row.message_id)
+        row.became = "touchpoint" if touchpoint else skipped.get(row.message_id)
         row.became_text = SKIP_TEXT.get(row.became, "")
+        row.stitched_to = touchpoint.contact_id if touchpoint and touchpoint.stitched_from else ""
+        row.time_text = TIME_TEXT.get((row.normalized or {}).get("time_source", "timestamp"), "")
         row.campaign_key = " / ".join(
             (row.normalized or {}).get(k) or "(none)"
             for k in ("utm_source", "utm_medium", "utm_campaign")

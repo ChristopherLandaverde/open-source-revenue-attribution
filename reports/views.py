@@ -2,13 +2,19 @@ from pathlib import Path
 
 from django.conf import settings
 from django.http import HttpResponseBadRequest
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 
 from contracts import ImportBatch
 from reports.forms import ImportForm
 from reports.imports import run_import
-from reports.models import ImportRun
-from reports.services import ISSUE_VIEWS, METRICS, first_touch_report, validation_view
+from reports.models import ImportRun, Opportunity
+from reports.services import (
+    ISSUE_VIEWS,
+    METRICS,
+    first_touch_report,
+    journey_view,
+    validation_view,
+)
 
 DEMO_PATH = Path(settings.BASE_DIR) / "sample_data" / "demo"
 
@@ -49,3 +55,18 @@ def import_csv(request):
     status = 400 if request.method == "POST" else 200
     context = {"form": form, "last_run": ImportRun.objects.first()}
     return render(request, "reports/import.html", context, status=status)
+
+
+def journey(request, opportunity_id: str):
+    """One opportunity's journey: every touch, why it is (in)eligible, and its credit."""
+    opportunity = get_object_or_404(
+        Opportunity.objects.select_related("account", "contact"), external_id=opportunity_id
+    )
+    metric = request.GET.get("metric", "pipeline")
+    if metric not in METRICS:
+        return HttpResponseBadRequest("Unknown metric.")
+    context = {"view": journey_view(opportunity, metric), "metrics": METRICS}
+    template = (
+        "reports/_journey.html" if request.headers.get("HX-Request") else "reports/journey.html"
+    )
+    return render(request, template, context)

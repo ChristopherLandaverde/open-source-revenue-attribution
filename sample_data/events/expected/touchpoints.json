@@ -1,13 +1,71 @@
 {
   "known_contacts": "sample_data/demo/contacts.csv accepted rows",
+  "received_at": "2026-09-03T09:00:03+00:00",
   "validation": {
-    "received": 10,
-    "accepted": ["evt-01", "evt-02", "evt-03", "evt-04", "evt-05", "evt-06", "evt-07", "evt-10"],
-    "duplicates": ["evt-03"],
-    "rejected": {"evt-09": ["TIMESTAMP_WITHOUT_TIMEZONE"]},
-    "warnings": {"evt-05": ["MISSING_CAMPAIGN_FIELDS"], "evt-03": ["DUPLICATE_ROW"]}
+    "received": 16,
+    "accepted": [
+      "evt-01",
+      "evt-02",
+      "evt-03",
+      "evt-04",
+      "evt-05",
+      "evt-06",
+      "evt-07",
+      "evt-10",
+      "evt-11",
+      "evt-12",
+      "evt-13",
+      "evt-14",
+      "evt-15",
+      "evt-16"
+    ],
+    "duplicates": [
+      "evt-03"
+    ],
+    "rejected": {
+      "evt-09": [
+        "TIMESTAMP_WITHOUT_TIMEZONE"
+      ]
+    },
+    "warnings": {
+      "evt-05": [
+        "MISSING_CAMPAIGN_FIELDS"
+      ],
+      "evt-03": [
+        "DUPLICATE_ROW"
+      ],
+      "evt-11": [
+        "MISSING_CAMPAIGN_FIELDS"
+      ],
+      "evt-12": [
+        "CLOCK_SKEW_NOT_CORRECTED",
+        "MISSING_CAMPAIGN_FIELDS"
+      ],
+      "evt-13": [
+        "MISSING_CAMPAIGN_FIELDS"
+      ]
+    },
+    "event_times": {
+      "evt-07": "2026-09-03T09:00:01+00:00",
+      "evt-11": "2026-09-03T09:00:02+00:00",
+      "evt-12": "2026-09-03T09:10:00+00:00"
+    }
   },
   "touchpoints": [
+    {
+      "touchpoint_id": "evt-01",
+      "contact_id": "con-nw-li",
+      "occurred_at": "2026-09-02T08:10:00+00:00",
+      "source": "google",
+      "medium": "cpc",
+      "campaign": "fall-search",
+      "content": "ad-b",
+      "term": "revenue attribution",
+      "landing_page": "https://www.acme.example/pricing?utm_source=google&utm_medium=cpc&utm_campaign=fall-search&utm_content=ad-b&utm_term=revenue%20attribution",
+      "referrer": "https://www.google.com/",
+      "stitched_from": "anon-li-1",
+      "visit_rule": "FIRST_VISIT"
+    },
     {
       "touchpoint_id": "evt-03",
       "contact_id": "con-nw-li",
@@ -18,19 +76,9 @@
       "content": "ad-b",
       "term": "revenue attribution",
       "landing_page": "https://www.acme.example/pricing?utm_source=google&utm_medium=cpc&utm_campaign=fall-search&utm_content=ad-b&utm_term=revenue%20attribution",
-      "referrer": "https://www.google.com/"
-    },
-    {
-      "touchpoint_id": "evt-05",
-      "contact_id": "con-nw-li",
-      "occurred_at": "2026-09-02T08:20:00+00:00",
-      "source": "",
-      "medium": "",
-      "campaign": "",
-      "content": "",
-      "term": "",
-      "landing_page": "https://www.acme.example/demo/booked",
-      "referrer": "https://www.acme.example/demo"
+      "referrer": "https://www.google.com/",
+      "stitched_from": "",
+      "visit_rule": "CAMPAIGN_DATA"
     },
     {
       "touchpoint_id": "evt-10",
@@ -42,25 +90,95 @@
       "content": "",
       "term": "",
       "landing_page": "https://www.acme.example/customers?utm_source=linkedin&utm_medium=paid-social&utm_campaign=fall-abm",
-      "referrer": "https://www.linkedin.com/"
+      "referrer": "https://www.linkedin.com/",
+      "stitched_from": "",
+      "visit_rule": "NEW_CAMPAIGN"
+    },
+    {
+      "touchpoint_id": "evt-13",
+      "contact_id": "con-nw-li",
+      "occurred_at": "2026-09-02T09:00:00+00:00",
+      "source": "",
+      "medium": "",
+      "campaign": "",
+      "content": "",
+      "term": "",
+      "landing_page": "https://www.acme.example/pricing",
+      "referrer": "",
+      "stitched_from": "",
+      "visit_rule": "INACTIVITY"
     },
     {
       "touchpoint_id": "evt-07",
       "contact_id": "con-ke-otto",
-      "occurred_at": "2026-09-03T09:00:00+00:00",
+      "occurred_at": "2026-09-03T09:00:01+00:00",
       "source": "newsletter",
       "medium": "email",
       "campaign": "sept-digest",
       "content": "",
       "term": "",
       "landing_page": "https://www.acme.example/blog/audit-trails?utm_source=newsletter&utm_medium=email&utm_campaign=sept-digest",
-      "referrer": ""
+      "referrer": "",
+      "stitched_from": "",
+      "visit_rule": "FIRST_VISIT"
+    },
+    {
+      "touchpoint_id": "evt-12",
+      "contact_id": "con-ke-otto",
+      "occurred_at": "2026-09-03T09:10:00+00:00",
+      "source": "",
+      "medium": "",
+      "campaign": "",
+      "content": "",
+      "term": "",
+      "landing_page": "https://www.acme.example/security",
+      "referrer": "https://duckduckgo.com/",
+      "stitched_from": "",
+      "visit_rule": "NEW_REFERRER"
     }
   ],
+  "internal_views": [
+    [
+      "evt-05",
+      "con-nw-li"
+    ],
+    [
+      "evt-11",
+      "con-ke-otto"
+    ]
+  ],
   "skipped": [
-    {"event_id": "evt-01", "reason": "ANONYMOUS"},
-    {"event_id": "evt-02", "reason": "NOT_A_PAGE_VIEW"},
-    {"event_id": "evt-04", "reason": "NOT_A_PAGE_VIEW"},
-    {"event_id": "evt-06", "reason": "CONTACT_NOT_IMPORTED"}
+    {
+      "event_id": "evt-02",
+      "reason": "NOT_A_PAGE_VIEW"
+    },
+    {
+      "event_id": "evt-04",
+      "reason": "NOT_A_PAGE_VIEW"
+    },
+    {
+      "event_id": "evt-05",
+      "reason": "INTERNAL_NAVIGATION"
+    },
+    {
+      "event_id": "evt-06",
+      "reason": "CONTACT_NOT_IMPORTED"
+    },
+    {
+      "event_id": "evt-11",
+      "reason": "INTERNAL_NAVIGATION"
+    },
+    {
+      "event_id": "evt-14",
+      "reason": "AMBIGUOUS_IDENTITY"
+    },
+    {
+      "event_id": "evt-15",
+      "reason": "NOT_A_PAGE_VIEW"
+    },
+    {
+      "event_id": "evt-16",
+      "reason": "NOT_A_PAGE_VIEW"
+    }
   ]
 }

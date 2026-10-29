@@ -16,8 +16,8 @@ a named model and lookback window.
 Attribution here is a reporting model. It shows how a stated rule assigns credit; it does not
 estimate causal impact or incrementality.
 
-**Status:** M2 (collection and persistence) on a work branch; M1 is on `main`. One model
-(first-touch). Milestones: [docs/project-management-plan.md](docs/project-management-plan.md).
+**Status:** M3 (identity stitching, visits, opportunity journeys) on a work branch; M2 is on
+`main`. One model (first-touch). Milestones: [docs/project-management-plan.md](docs/project-management-plan.md).
 
 ![First-touch attribution report on the synthetic demo data: credit by source / medium / campaign per currency, with the model and 90-day lookback window shown above the tables](docs/media/report.png)
 
@@ -38,7 +38,9 @@ uv run python manage.py runserver
 ```
 
 Open http://127.0.0.1:8000/ for the first-touch report on the synthetic demo data. Switch
-between **Pipeline** and **Won revenue** to swap the tables in place.
+between **Pipeline** and **Won revenue** to swap the tables in place. Click an opportunity to
+open its journey: every touch of its contact, why each one is or isn't eligible, and the
+credit it gets.
 http://127.0.0.1:8000/validation/ shows what the import refused and why: the demo data has 10
 invalid rows on purpose.
 
@@ -54,8 +56,8 @@ curl -u '<key>:' -H 'Content-Type: application/json' \
   --data @sample_data/events/batch.json http://127.0.0.1:8000/v1/batch
 ```
 
-The response lists each event's outcome. Here: 10 received, 8 accepted, 1 duplicate, 1 refused
-(`TIMESTAMP_WITHOUT_TIMEZONE`). Send it again and nothing new is stored: 9 duplicates,
+The response lists each event's outcome. Here: 16 received, 14 accepted, 1 duplicate, 1 refused
+(`TIMESTAMP_WITHOUT_TIMEZONE`). Send it again and nothing new is stored: 15 duplicates,
 1 refused. http://127.0.0.1:8000/events/ shows the events and which became touchpoints.
 
 With `DEBUG=true`, http://127.0.0.1:8000/events/demo/ loads the RudderStack JavaScript SDK and
@@ -79,15 +81,16 @@ The Postgres path has not been run end to end yet; tests and the steps above use
 
 | Area | What you get | Status |
 |---|---|---|
-| Data contract | CSV import and RudderStack event rules, 21 refusal and 7 warning codes ([docs/contract.md](docs/contract.md)) | Works |
+| Data contract | CSV import and RudderStack event rules, 21 refusal and 8 warning codes ([docs/contract.md](docs/contract.md)) | Works |
 | CSV import | `load_sample_data --path <dir>` or the **Import CSV** page: validate, load accepted rows, list refused ones. Partial by default, `--strict` / Strict checkbox refuses everything on any error. Re-import updates by ID. | Works |
 | Validation report | `/validation/`: verdict, counts per file, every refused row and warning with its code and how to fix it | Works |
 | Event collection | `POST /v1/batch`, `/v1/page`, `/v1/track`, `/v1/identify` with a per-workspace write key. Validated, deduplicated on `messageId`, raw payload and outcome stored. | Works |
-| Events to touchpoints | Identified page views of imported contacts become touchpoints; UTMs only from `context.campaign` | Works |
+| Events to touchpoints | An identify links the browser's earlier anonymous page views to the contact. Page views that start a visit (first view, 30+ minutes idle, new campaign, new referring site) or carry UTMs become touchpoints; internal navigation does not. Browser clock skew corrected with receive time minus `sentAt`. | Works |
+| Opportunity journey | `/opportunities/<id>/journey/`: each touch of the opportunity's contact in a fixed order, its lookback status, the visit rule that admitted it, and its first-touch credit | Works |
 | Attribution | First-touch, pipeline (at creation) and won revenue (at close), 90-day lookback, totals per currency | Works |
 | Demo fixtures | Synthetic CSVs and events with hand-calculated expected results ([sample_data/](sample_data/)) | Works |
 | Last-touch and linear, side by side | | Planned (M4) |
-| Account and contact journeys, stage history, identify stitching | | Planned (M3) |
+| Combined account journey, stage history | | Planned |
 | Data readiness panel, attributed vs influenced | | Planned (M4) |
 | Self-hosting guide, release | | Planned (M5) |
 
@@ -99,24 +102,26 @@ The Postgres path has not been run end to end yet; tests and the steps above use
 - **Same-origin collection only.** The endpoint sends no CORS headers, so a site on another
   domain cannot post to it from the browser yet.
 - **One dataset.** Write keys identify the sender; workspaces do not isolate data.
-- **No sessionisation.** Every identified page view is a touchpoint, including internal pages
-  without UTMs (shown as `(none)`). Anonymous page views before an identify are not linked to
-  the contact. Both are open decisions ([contract assumptions 16-21](docs/contract.md#m2-assumptions-not-yet-reviewed)).
-- **Browser clock.** Events from the SDK carry `originalTimestamp` only, so event time is the
-  visitor's clock, uncorrected.
+- **Identity is identify-only.** Anonymous views link to a contact only through an identify on
+  the same browser (`anonymousId`), and only views before it. A browser identified as two
+  contacts links to neither. Rules: [contract §3](docs/contract.md#from-events-to-touchpoints).
+- **Touchpoints are recomputed from all events** on every collection request; fine for demo
+  volumes, not tuned for large ones.
+- **Journeys are per opportunity contact.** The page lists the account's other contacts but
+  does not combine them into an account journey yet.
 - **Stages are `open` and `won` only**; mixed currencies are reported side by side, never summed.
 - **Postgres is untested**; SQLite is what tests and the steps above use.
 
 ## How it works
 
-`CSV row / event → contract validator → stored record → touchpoints of the opportunity's contact → named model → credit per opportunity`
+`CSV row / event → contract validator → stored record → touchpoints of the opportunity's contact → eligible journey → named model → credit per opportunity`
 
 | Path | What |
 |---|---|
-| `contracts/` | Pure-Python contract: import and event validators, reason codes, event → touchpoint conversion. No Django imports (a test enforces it). |
-| `attribution/` | Pure-Python models and types. No Django imports. |
+| `contracts/` | Pure-Python contract: import and event validators, reason codes, clock-skew correction, event → touchpoint conversion (stitching, visits). No Django imports (a test enforces it). |
+| `attribution/` | Pure-Python models, types and journeys. No Django imports. |
 | `collection/` | Django app: write-key workspaces, `/v1/` endpoint, stored events, events page, SDK demo page. |
-| `reports/` | Django app: records, imports (command and upload page), report and validation pages. |
+| `reports/` | Django app: records, imports (command and upload page), report, journey and validation pages. |
 | `sample_data/` | Synthetic demo CSVs and events with hand-calculated expected results. |
 | `static/` | Plain CSS with Focosys design tokens; vendored HTMX, RudderStack SDK and fonts (versions and hashes in `static/vendor/README.md`). |
 | `docs/` | Data contract, PRD, decisions, project management plan, market research. |

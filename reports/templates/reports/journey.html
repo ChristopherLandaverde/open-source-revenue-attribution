@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Journey: {{ view.opportunity.name|default:view.opportunity.external_id }} · Open Source Revenue Attribution{% endblock %}
+{% block content %}
+<p class="small"><a href="{% url 'reports:report' %}?metric={{ view.metric }}">← Back to the report</a></p>
+<h1>Journey: {{ view.opportunity.name|default:view.opportunity.external_id }}</h1>
+<p class="notice">
+  Every touch of this opportunity's contact, in time order, with why it is or isn't eligible and the
+  credit the <strong>{{ view.model_name }}</strong> model gives it. This is association under a named
+  rule, not causal impact.
+</p>
+
+<form class="controls" hx-get="{% url 'reports:journey' view.opportunity.external_id %}" hx-target="#results" hx-indicator="#results"
+      hx-swap="outerHTML" hx-trigger="change" hx-push-url="true">
+  <fieldset>
+    <legend>Amount to attribute</legend>
+    {% for value, label in metrics.items %}
+      <label>
+        <input type="radio" name="metric" value="{{ value }}" {% if value == view.metric %}checked{% endif %}>
+        {{ label }}{% if value == "won" and not view.won %} <span class="muted small">(not won yet)</span>{% endif %}
+      </label>
+    {% endfor %}
+  </fieldset>
+  <noscript><button class="button" type="submit">Show selected amount</button></noscript>
+</form>
+
+{% include "reports/_journey.html" %}
+{% endblock %}

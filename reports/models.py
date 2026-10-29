@@ -69,6 +69,10 @@ class Touchpoint(models.Model):
     term = models.CharField(max_length=200, blank=True)
     landing_page = models.CharField(max_length=500, blank=True)
     referrer = models.CharField(max_length=500, blank=True)
+    # Event touchpoints only (contracts/touchpoints.py): the anonymousId when the page view was
+    # linked to the contact by a later identify, and the visit rule that made it a touchpoint.
+    stitched_from = models.CharField(max_length=255, blank=True)
+    visit_rule = models.CharField(max_length=32, blank=True)
 
     class Meta:
         constraints = [

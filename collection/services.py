@@ -5,7 +5,7 @@ only persists what those pure functions decide.
 """
 
 import secrets
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
 from typing import Any
 
@@ -49,7 +49,11 @@ def _issue_dicts(issues, position: int) -> list[dict]:
 
 
 def ingest(workspace: Workspace, payloads: list[Any]) -> list[Outcome]:
-    """Validate and store each payload in order; return one Outcome per payload."""
+    """Validate and store each payload in order; return one Outcome per payload.
+
+    Touchpoints are then recomputed from every accepted event, because an identify can
+    stitch earlier page views and a new page view can change which views start a visit.
+    """
     outcomes = []
     for position, payload in enumerate(payloads, start=1):
         try:
@@ -58,6 +62,8 @@ def ingest(workspace: Workspace, payloads: list[Any]) -> list[Outcome]:
             # A concurrent request stored the same messageId or payload first: re-run, and
             # the payload now meets the stored row (a retry or a conflict).
             outcomes.append(_ingest_one(workspace, payload, position))
+    if any(o.outcome == "accepted" for o in outcomes):
+        sync_event_touchpoints()
     return outcomes
 
 
@@ -74,7 +80,9 @@ def _ingest_one(workspace: Workspace, payload: Any, position: int) -> Outcome:
         else None
     )
     report = validate_events(
-        [payload], already_accepted={message_id: earlier.fingerprint} if earlier else None
+        [payload],
+        already_accepted={message_id: earlier.fingerprint} if earlier else None,
+        received_at=now,  # receivedAt for clock-skew correction (decision #5)
     )
 
     if report.accepted:
@@ -93,7 +101,6 @@ def _ingest_one(workspace: Workspace, payload: Any, position: int) -> Outcome:
             occurred_at=event.occurred_at,
             normalized=_to_json(event),
         )
-        _save_touchpoints(events_to_touchpoints([event], _contacts_for([event])))
         warnings = _issue_dicts(report.warnings, position)
         return Outcome(position, event.event_id, "accepted", warnings)
 
@@ -130,6 +137,8 @@ def _to_json(event: Event) -> dict:
 
 
 def _from_json(data: dict) -> Event:
+    known = {f.name for f in fields(Event)}
+    data = {k: v for k, v in data.items() if k in known}
     return Event(**{**data, "occurred_at": datetime.fromisoformat(data["occurred_at"])})
 
 
@@ -139,7 +148,7 @@ def accepted_events() -> list[Event]:
 
 
 def _contacts_for(events: list[Event]) -> set[str]:
-    user_ids = {e.user_id for e in events if e.user_id}
+    user_ids = {e.user_id for e in events if e.user_id}  # identify userIds cover stitched views
     found = Contact.objects.filter(external_id__in=user_ids)
     return set(found.values_list("external_id", flat=True))
 
@@ -165,8 +174,15 @@ def _save_touchpoints(conversion: TouchpointConversion) -> None:
                 "term": tp.term,
                 "landing_page": tp.landing_page,
                 "referrer": tp.referrer,
+                "stitched_from": tp.stitched_from[:255],
+                "visit_rule": tp.visit_rule,
             },
         )
+    # Page views that no longer qualify (now internal navigation, or now ambiguous) go away.
+    stale = Touchpoint.objects.filter(origin=Touchpoint.Origin.EVENT).exclude(
+        external_id__in=[tp.touchpoint_id for tp in conversion.touchpoints]
+    )
+    stale.delete()
 
 
 def convert_events() -> TouchpointConversion:

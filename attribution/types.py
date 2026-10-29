@@ -58,17 +58,20 @@ class AttributionModel(Protocol):
     def attribute(self, conversion: Conversion) -> list[Credit]: ...
 
 
+def window_start(conversion: Conversion, lookback_days: int) -> datetime:
+    """The earliest eligible instant: conversion time minus the lookback (inclusive)."""
+    return conversion.converted_at - timedelta(days=lookback_days)
+
+
 def eligible_touchpoints(conversion: Conversion, lookback_days: int) -> list[Touchpoint]:
     """Touchpoints inside [converted_at - lookback, converted_at], oldest first.
 
     Both window ends are inclusive. Ties on time are broken by touchpoint id so the
     same input always produces the same order.
     """
-    window_start = conversion.converted_at - timedelta(days=lookback_days)
+    start = window_start(conversion, lookback_days)
     eligible = [
-        tp
-        for tp in conversion.touchpoints
-        if window_start <= tp.occurred_at <= conversion.converted_at
+        tp for tp in conversion.touchpoints if start <= tp.occurred_at <= conversion.converted_at
     ]
     return sorted(eligible, key=lambda tp: (tp.occurred_at, tp.id))
 
