@@ -1,0 +1,41 @@
+{
+  "_about": "Hand-written expected validation of sample_data/demo (90-day lookback). Derivation in ../README.md. Rows count the header as row 1.",
+  "ok": false,
+  "counts": {
+    "accounts": {"received": 5, "accepted": 4, "rejected": 1, "duplicates": 0},
+    "contacts": {"received": 9, "accepted": 7, "rejected": 1, "duplicates": 1},
+    "opportunities": {"received": 10, "accepted": 6, "rejected": 4, "duplicates": 0},
+    "touchpoints": {"received": 19, "accepted": 15, "rejected": 4, "duplicates": 0}
+  },
+  "accepted_ids": {
+    "accounts": ["acc-northwind", "acc-umbra", "acc-kestrel", "acc-sakura"],
+    "contacts": ["con-nw-ana", "con-nw-raj", "con-nw-li", "con-um-eve", "con-um-sam", "con-ke-otto", "con-sk-yui"],
+    "opportunities": ["opp-101", "opp-102", "opp-103", "opp-104", "opp-105", "opp-106"],
+    "touchpoints": ["tp-01", "tp-02", "tp-03", "tp-04", "tp-05", "tp-06", "tp-08", "tp-07", "tp-09", "tp-10", "tp-11", "tp-12", "tp-13", "tp-14", "tp-15"]
+  },
+  "file_errors": [],
+  "rejected": [
+    ["accounts.csv", 6, "acc beta", "INVALID_ID", "account_id"],
+    ["contacts.csv", 10, "con-ghost", "UNKNOWN_ACCOUNT", "account_id"],
+    ["opportunities.csv", 8, "opp-107", "AMOUNT_PRECISION", "amount"],
+    ["opportunities.csv", 9, "opp-108", "WON_AT_REQUIRED", "won_at"],
+    ["opportunities.csv", 10, "opp-109", "CONTACT_ACCOUNT_MISMATCH", "contact_id"],
+    ["opportunities.csv", 11, "opp-110", "INVALID_CURRENCY", "currency"],
+    ["touchpoints.csv", 17, "tp-16", "TIMESTAMP_WITHOUT_TIMEZONE", "occurred_at"],
+    ["touchpoints.csv", 18, "tp-17", "UNKNOWN_CONTACT", "contact_id"],
+    ["touchpoints.csv", 19, "tp-18", "DUPLICATE_ID", "touchpoint_id"],
+    ["touchpoints.csv", 20, "tp-18", "DUPLICATE_ID", "touchpoint_id"]
+  ],
+  "warnings": [
+    ["contacts.csv", 9, "con-nw-raj", "DUPLICATE_ROW", "contact_id"],
+    ["opportunities.csv", 5, "opp-104", "OPPORTUNITY_WITHOUT_CONTACT", "contact_id"],
+    ["touchpoints.csv", 6, "tp-05", "TOUCHPOINT_OUTSIDE_LOOKBACK", "occurred_at"],
+    ["touchpoints.csv", 7, "tp-06", "TOUCHPOINT_OUTSIDE_LOOKBACK", "occurred_at"],
+    ["touchpoints.csv", 10, "tp-09", "MISSING_CAMPAIGN_FIELDS", "utm_source, utm_medium, utm_campaign"],
+    ["touchpoints.csv", 11, "tp-10", "TOUCHPOINT_OUTSIDE_LOOKBACK", "occurred_at"],
+    ["touchpoints.csv", 12, "tp-11", "TOUCHPOINT_OUTSIDE_LOOKBACK", "occurred_at"],
+    ["touchpoints.csv", 13, "tp-12", "MISSING_CAMPAIGN_FIELDS", "utm_medium, utm_campaign"],
+    ["touchpoints.csv", 14, "tp-13", "MISSING_CAMPAIGN_FIELDS", "utm_source, utm_medium, utm_campaign"],
+    ["touchpoints.csv", 16, "tp-15", "TOUCHPOINT_OUTSIDE_LOOKBACK", "occurred_at"]
+  ]
+}

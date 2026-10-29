@@ -31,8 +31,8 @@
     <tbody>
     {% for row in report.opportunity_rows %}
       <tr>
-        <td>{{ row.opportunity.name }}</td>
-        <td>{{ row.opportunity.contact.account.name }}</td>
+        <td>{{ row.opportunity.name|default:row.opportunity.external_id }}</td>
+        <td>{{ row.opportunity.account.name|default:row.opportunity.account.external_id }}</td>
         <td>{{ row.converted_at|date:"Y-m-d H:i" }} UTC</td>
         <td>{{ row.credit.touchpoint_id|default:"None eligible" }}</td>
         <td>{{ row.credit.campaign_key }}</td>

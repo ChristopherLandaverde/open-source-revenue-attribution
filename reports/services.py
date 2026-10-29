@@ -47,7 +47,8 @@ def to_conversion(opportunity: Opportunity, metric: str) -> attribution.Conversi
                 medium=tp.medium,
                 campaign=tp.campaign,
             )
-            for tp in opportunity.contact.touchpoints.all()
+            # Contact-level attribution (PRD section 6): no contact means no touchpoints.
+            for tp in (opportunity.contact.touchpoints.all() if opportunity.contact else ())
         ),
     )
 
@@ -56,7 +57,7 @@ def first_touch_report(metric: str = "pipeline") -> Report:
     if metric not in METRICS:
         raise ValueError(f"Unknown metric: {metric}")
     model = attribution.FirstTouch(lookback_days=settings.ATTRIBUTION_LOOKBACK_DAYS)
-    opportunities = Opportunity.objects.select_related("contact__account").prefetch_related(
+    opportunities = Opportunity.objects.select_related("account", "contact").prefetch_related(
         "contact__touchpoints"
     )
     if metric == "won":

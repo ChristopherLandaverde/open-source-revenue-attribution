@@ -1,0 +1,20 @@
+touchpoint_id,contact_id,occurred_at,utm_source,utm_medium,utm_campaign,utm_content,utm_term,landing_page,referrer
+tp-01,con-nw-ana,2026-02-10T14:00:00Z,google,cpc,q1-search,,attribution software,/pricing,https://www.google.com/
+tp-02,con-nw-ana,2026-03-05T10:00:00Z,linkedin,paid-social,abm-launch,carousel-a,,/demo,
+tp-03,con-nw-ana,2026-05-10T16:00:00Z,partner,referral,may-webinar,,,/webinar,https://partner.example/
+tp-04,con-nw-raj,2026-04-28T09:00:00Z,newsletter,email,april-digest,,,/blog/attribution,
+tp-05,con-nw-raj,2026-05-25T09:00:00Z,newsletter,email,may-digest,,,/blog/journeys,
+tp-06,con-nw-li,2026-04-15T11:00:00Z,google,cpc,q2-search,,,/pricing,
+tp-08,con-um-eve,2026-02-20T08:30:00Z,linkedin,paid-social,abm-launch,,,/demo,
+tp-07,con-um-eve,2026-02-20T08:30:00Z,google,cpc,q1-search,,,/pricing,
+tp-09,con-um-eve,2026-04-02T12:00:00+02:00,,,,,,/demo,
+tp-10,con-um-sam,2026-03-01T10:00:00Z,bing,cpc,q1-search,,,/pricing,
+tp-11,con-ke-otto,2025-12-01T10:00:00Z,google,cpc,q4-search,,,/,
+tp-12,con-ke-otto,2026-03-15T11:00:00+01:00,linkedin,,,,,/security,
+tp-13,con-ke-otto,2026-05-20T10:00:00Z,,,,,,/,
+tp-14,con-sk-yui,2026-02-04T00:00:00+09:00,event,trade-show,robotics-expo,,,/expo,
+tp-15,con-sk-yui,2026-02-03T23:59:00+09:00,google,cpc,q1-search-jp,,,/ja/,
+tp-16,con-nw-ana,2026-03-01T10:00:00,google,cpc,q1-search,,,/pricing,
+tp-17,con-ghost,2026-03-01T10:00:00Z,google,cpc,q1-search,,,/pricing,
+tp-18,con-nw-raj,2026-04-01T10:00:00Z,google,cpc,q2-search,,,/pricing,
+tp-18,con-nw-raj,2026-04-01T10:00:00Z,bing,cpc,q2-search,,,/pricing,

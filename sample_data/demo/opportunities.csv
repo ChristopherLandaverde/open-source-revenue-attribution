@@ -1,0 +1,11 @@
+opportunity_id,account_id,contact_id,name,amount,currency,stage,created_at,won_at
+opp-101,acc-northwind,con-nw-ana,Northwind platform,24000.00,USD,won,2026-04-01T12:00:00Z,2026-06-15T12:00:00Z
+opp-102,acc-northwind,con-nw-raj,Northwind expansion,6000.00,USD,open,2026-05-20T12:00:00Z,
+opp-103,acc-umbra,con-um-eve,Umbra pilot,15000.00,USD,won,2026-03-10T09:00:00Z,2026-05-01T09:00:00Z
+opp-104,acc-umbra,,Umbra renewal,9000.00,USD,open,2026-06-01T09:00:00Z,
+opp-105,acc-kestrel,con-ke-otto,Kestrel core banking,18500.50,EUR,won,2026-04-20T12:00:00+02:00,2026-07-01T12:00:00+02:00
+opp-106,acc-sakura,con-sk-yui,Sakura line automation,1200000,JPY,open,2026-05-04T15:00:00Z,
+opp-107,acc-sakura,con-sk-yui,Sakura spare parts,1500.5,JPY,open,2026-05-10T00:00:00Z,
+opp-108,acc-kestrel,con-ke-otto,Kestrel add-on,4000.00,EUR,won,2026-05-01T09:00:00Z,
+opp-109,acc-northwind,con-um-sam,Mismatched deal,7000.00,USD,open,2026-04-15T09:00:00Z,
+opp-110,acc-umbra,con-um-eve,Umbra lowercase currency,3000.00,usd,open,2026-04-15T09:00:00Z,
