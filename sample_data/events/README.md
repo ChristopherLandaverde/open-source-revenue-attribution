@@ -53,7 +53,7 @@ Events with a `timestamp` use it as is. The others use
 
 Without the correction `evt-11` would sit at 07:00:30, *before* the newsletter visit, and
 become Otto's first touch with `(none) / (none) / (none)`. Corrected, it is one second after
-`evt-07` and is internal navigation.
+`evt-07` and is a later page view of `evt-07`'s session.
 
 ## Stitching (decision #5)
 
@@ -62,44 +62,75 @@ become Otto's first touch with `(none) / (none) / (none)`. Corrected, it is one 
 | `anon-li-1` | `con-nw-li` (`evt-02`, 08:14) | `evt-01` at 08:10, before the identify | **Stitched** to `con-nw-li`: the landing view with the UTMs now reaches her. (M2: `ANONYMOUS`, lost.) |
 | `anon-shared` | `con-nw-ana` (`evt-15`) **and** `con-nw-raj` (`evt-16`) | `evt-14` | `AMBIGUOUS_IDENTITY`: a shared browser, linked to nobody. |
 
-## Visits (decision #5)
+## Sessions (decision #7)
 
-Per contact, in time order (ties by messageId). A view starts a visit if it is the contact's
-first, comes more than 30 minutes after the previous view, carries a new campaign, or arrives
-from a new external site. Visit starts and campaign-carrying views are touchpoints.
+Per contact **and browser** (`anonymousId`), all of the contact's events (page, track,
+identify) in time order, ties by messageId. An event less than 30 minutes after the browser's
+previous event stays in the session; 30 minutes or more starts a new one. A new campaign or
+referrer does not. Each session is one touchpoint: its first page view.
 
-| Contact | View | Time (UTC) | Campaign / referrer host | Gap | Rule | Touchpoint? |
+| Contact · browser | Event | Time (UTC) | Type · campaign / referrer host | Gap to previous event | Session | Touchpoint? |
 |---|---|---|---|---|---|---|
-| `con-nw-li` | `evt-01` (stitched) | 09-02 08:10:00 | google / cpc / fall-search · google.com | — | `FIRST_VISIT` | yes |
-| | `evt-03` | 08:15:00 | same campaign · google.com (same) | 5 min | `CAMPAIGN_DATA` | yes |
-| | `evt-05` | 08:20:00 | none · own site | 5 min | `INTERNAL_NAVIGATION` | **no** (M2: yes) |
-| | `evt-10` | 08:20:00 | linkedin / paid-social / fall-abm | 0 | `NEW_CAMPAIGN` | yes |
-| | `evt-13` | 09:00:00 | none · none | 40 min | `INACTIVITY` | yes |
-| `con-ke-otto` | `evt-07` | 09-03 09:00:01 | newsletter / email / sept-digest · none | — | `FIRST_VISIT` | yes |
-| | `evt-11` | 09:00:02 | none · own site | 1 s | `INTERNAL_NAVIGATION` | no |
-| | `evt-12` | 09:10:00 | none · duckduckgo.com (new) | 9 min 58 s | `NEW_REFERRER` | yes |
+| `con-nw-li` · `anon-li-1` | `evt-01` (stitched) | 09-02 08:10:00 | page · google / cpc / fall-search · google.com | — | **S1** starts | **yes**, `FIRST_SESSION` |
+| | `evt-02` | 08:14:00 | identify | 4 min | S1 | — (not a page view) |
+| | `evt-03` | 08:15:00 | page · same campaign · google.com | 1 min | S1 | no, `SAME_SESSION` (M3: yes, `CAMPAIGN_DATA`) |
+| | `evt-04` | 08:18:00 | track `Demo Requested` | 3 min | S1 | — (not a page view) |
+| | `evt-05` | 08:20:00 | page · none · own site | 2 min | S1 | no, `SAME_SESSION` |
+| | `evt-13` | 09:00:00 | page · none · none | 40 min (≥ 30) | **S3** starts | **yes**, `INACTIVITY` |
+| `con-nw-li` · `anon-li-2` | `evt-10` | 09-02 08:20:00 | page · linkedin / paid-social / fall-abm | — (first event of this browser) | **S2** starts | **yes**, `NEW_DEVICE` (M3: `NEW_CAMPAIGN`) |
+| `con-ke-otto` · `anon-otto-1` | `evt-07` | 09-03 09:00:01 | page · newsletter / email / sept-digest · none | — | **S1** starts | **yes**, `FIRST_SESSION` |
+| | `evt-11` | 09:00:02 | page · none · own site | 1 s | S1 | no, `SAME_SESSION` |
+| | `evt-12` | 09:10:00 | page · none · duckduckgo.com | 9 min 58 s (< 30) | S1 | no, `SAME_SESSION` (M3: yes, `NEW_REFERRER`) |
+
+Li's sessions in order of start: S1 08:10 (`anon-li-1`, her first: `FIRST_SESSION`), S2 08:20
+(`anon-li-2`, a browser not seen before: `NEW_DEVICE`), S3 09:00 (`anon-li-1` again after
+40 minutes: `INACTIVITY`). S2 overlaps S1 in time but is a separate session because it is
+another browser (GA4 scopes sessions per browser). No session's first page view lacks UTMs
+while having an external referrer, so the referral rule does not fire here: `evt-13` has
+neither and stays `(none) / (none) / (none)`.
 
 ## Touchpoints (contracts/touchpoints.py)
 
-Ordered by (time in UTC, messageId):
+Ordered by (time in UTC, messageId). `session_id` = the touchpoint's own messageId:
 
 | Order | Touchpoint | Contact | Time (UTC) | Source / medium / campaign | Rule |
 |---|---|---|---|---|---|
-| 1 | `evt-01` | `con-nw-li` | 2026-09-02 08:10:00 | google / cpc / fall-search, content `ad-b`, term `revenue attribution` | `FIRST_VISIT`, stitched from `anon-li-1` |
-| 2 | `evt-03` | `con-nw-li` | 2026-09-02 08:15:00 | google / cpc / fall-search (10:15+02:00 = 08:15Z) | `CAMPAIGN_DATA` |
-| 3 | `evt-10` | `con-nw-li` | 2026-09-02 08:20:00 | linkedin / paid-social / fall-abm | `NEW_CAMPAIGN` |
-| 4 | `evt-13` | `con-nw-li` | 2026-09-02 09:00:00 | (none) / (none) / (none) | `INACTIVITY` |
-| 5 | `evt-07` | `con-ke-otto` | 2026-09-03 09:00:01 | newsletter / email / sept-digest | `FIRST_VISIT` |
-| 6 | `evt-12` | `con-ke-otto` | 2026-09-03 09:10:00 | (none) / (none) / (none) | `NEW_REFERRER` |
+| 1 | `evt-01` | `con-nw-li` | 2026-09-02 08:10:00 | google / cpc / fall-search, content `ad-b`, term `revenue attribution` | `FIRST_SESSION`, stitched from `anon-li-1` |
+| 2 | `evt-10` | `con-nw-li` | 2026-09-02 08:20:00 | linkedin / paid-social / fall-abm | `NEW_DEVICE` |
+| 3 | `evt-13` | `con-nw-li` | 2026-09-02 09:00:00 | (none) / (none) / (none) | `INACTIVITY` |
+| 4 | `evt-07` | `con-ke-otto` | 2026-09-03 09:00:01 | newsletter / email / sept-digest | `FIRST_SESSION` |
 
-Not touchpoints (accepted events are kept):
+Page views inside a session (`session_views`, shown in the journey, never counted):
+
+| Page view | In the session started by |
+|---|---|
+| `evt-03` (08:15), `evt-05` (08:20) | `evt-01` |
+| `evt-11` (09:00:02), `evt-12` (09:10) | `evt-07` |
+
+Not touchpoints (accepted events are kept), in event order:
 
 | Event | Reason |
 |---|---|
 | `evt-02`, `evt-04`, `evt-15`, `evt-16` | `NOT_A_PAGE_VIEW` (identify, track) |
-| `evt-05`, `evt-11` | `INTERNAL_NAVIGATION` (shown in the contact's journey) |
+| `evt-03`, `evt-05`, `evt-11`, `evt-12` | `SAME_SESSION` |
 | `evt-06` | `CONTACT_NOT_IMPORTED`: `con-unknown` is not in contacts.csv. |
 | `evt-14` | `AMBIGUOUS_IDENTITY` |
+
+## What moved with decision #7 (sessions)
+
+| Number | M3 | #7 | Why |
+|---|---|---|---|
+| Touchpoints in total | 6 | **4** | One per session. |
+| `evt-03` | touchpoint, `CAMPAIGN_DATA` | in session `evt-01` | Same browser 5 min after `evt-01`; carrying the same campaign no longer counts it again. |
+| `evt-12` | touchpoint, `NEW_REFERRER` | in session `evt-07` | 9 min 58 s after `evt-11`; a new referrer no longer splits a session. |
+| `evt-10` rule | `NEW_CAMPAIGN` | `NEW_DEVICE` | Still a touchpoint, now because it is another browser (`anon-li-2`), not because of its campaign. |
+| `evt-01`, `evt-07` rule | `FIRST_VISIT` | `FIRST_SESSION` | Renamed; same touchpoint. |
+| `evt-13` | `INACTIVITY` | `INACTIVITY` | 40 min after `evt-05` on the same browser. |
+| `evt-05`, `evt-11` | `INTERNAL_NAVIGATION` | `SAME_SESSION` | Renamed reason; still not touchpoints. |
+| Validation, event times, stitching | — | unchanged | Decisions 16, 18, 19 are untouched. |
+
+First-touch credit for any of these contacts would not move: each contact's earliest touch
+(`evt-01`, `evt-07`) is unchanged. A multi-touch model would see Li's 4 M3 touches become 3.
 
 ## What moved since M2
 
@@ -112,5 +143,5 @@ Not touchpoints (accepted events are kept):
 | Touchpoints in total | 4 | 6 | Plus `evt-13` (inactivity) and `evt-12` (new referrer). |
 
 The demo report (`sample_data/demo/expected/first_touch.json`) does not move: its touchpoints
-come from touchpoints.csv, which the visit rules don't touch, and every event is dated after
+come from touchpoints.csv, which the session rules don't touch, and every event is dated after
 every demo conversion.

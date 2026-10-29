@@ -51,15 +51,27 @@
       </tr></thead>
       <tbody>
       {% for row in view.rows %}
-        <tr>
+        {% if row.status == "in_session" %}
+        <tr class="in-session">
+          <td class="num">—</td>
+          <td class="mono">{{ row.occurred_at|date:"Y-m-d H:i:s" }}</td>
+          <td><span class="mono nowrap">↳ {{ row.touchpoint_id }}</span><br><span class="small muted">page view</span></td>
+          <td><span class="mono">{{ row.campaign_key }}</span>{% if row.landing_page %}<br><span class="small muted mono">{{ row.landing_page|truncatechars:60 }}</span>{% endif %}</td>
+          <td>{% if row.session_number %}Part of session {{ row.session_number }}, started by touch #{{ row.position }}{% else %}Part of the session started by <span class="mono">{{ row.session_id }}</span>{% endif %}; not counted again.</td>
+          <td><span class="tag {{ row.status_class }}">{{ row.status_label }}</span><br><span class="small">{{ row.window_text }}</span></td>
+          <td class="num">—</td>
+        </tr>
+        {% else %}
+        <tr{% if row.session_number %} class="session-start"{% endif %}>
           <td class="num">{{ row.position|default:"—" }}</td>
           <td class="mono">{{ row.occurred_at|date:"Y-m-d H:i:s" }}</td>
           <td><span class="mono nowrap">{{ row.touchpoint_id }}</span><br><span class="small muted">{% if row.origin == "csv" %}touchpoints.csv{% else %}page event{% endif %}</span></td>
           <td><span class="mono">{{ row.campaign_key }}</span>{% if row.landing_page %}<br><span class="small muted mono">{{ row.landing_page|truncatechars:60 }}</span>{% endif %}</td>
-          <td>{{ row.how }}{% if row.stitched_from %}<br><span class="small">Anonymous view, linked by an identify of <span class="mono">{{ row.stitched_from }}</span>.</span>{% endif %}</td>
+          <td>{% if row.session_number %}<strong>Session {{ row.session_number }} · {{ row.session_size }} page view{{ row.session_size|pluralize }}</strong><br>{% endif %}{{ row.how }}{% if row.stitched_from %}<br><span class="small">Anonymous view, linked by an identify of <span class="mono">{{ row.stitched_from }}</span>.</span>{% endif %}</td>
           <td><span class="tag {{ row.status_class }}">{{ row.status_label }}</span><br><span class="small">{{ row.window_text }}</span></td>
           <td class="num">{% if row.credit is None %}—{% else %}{{ row.credit|minor_unit:opp.currency }}{% endif %}</td>
         </tr>
+        {% endif %}
       {% endfor %}
       </tbody>
       <tfoot>
@@ -95,7 +107,7 @@
 
   <h2>Rules used</h2>
   <dl class="codes small">
-    <dt class="label">Visits</dt><dd>A page view starts a visit when it is the contact's first, comes over 30 minutes after the previous one, carries a new campaign, or arrives from another site. Visit starts and views with campaign data are touches; the rest is internal navigation.</dd>
+    <dt class="label">Sessions</dt><dd>A session is one browser's events less than 30 minutes apart; 30 minutes without activity starts a new one. A new campaign, a new referrer or midnight does not. Each session is one touch, credited to its first page view's UTMs, or to its referrer when it has none (as in Dreamdata and GA4). Its other page views are listed under it and never counted again.</dd>
     <dt class="label">Identity</dt><dd>An identify links earlier anonymous views of the same <code>anonymousId</code> to its contact. A browser identified as two contacts links to neither.</dd>
     <dt class="label">Time</dt><dd>Event time is corrected for the browser's clock error: receive time minus <code>sentAt</code>.</dd>
   </dl>

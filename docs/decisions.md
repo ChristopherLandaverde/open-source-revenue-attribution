@@ -2,13 +2,41 @@
 
 Product and data-meaning decisions, newest first. Each links the issue where it was made.
 
+## 2026-10-29 — One touchpoint per session (replaces assumption 17's visit rule)
+
+[#7](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/7)
+
+- **Session:** a contact's web events (page, track, identify) from one browser less than 30
+  minutes apart. Only inactivity (30 minutes or more) starts a new session; a new campaign or
+  referrer does not.
+- **One touch per session,** credited to its first page view's UTMs, or to its referrer
+  (source = host, medium = `referral`) when it has none.
+- **Page views inside a session** stay visible in the journey, labelled as part of the
+  session started by its touch, and are never counted again.
+- **Why:** this is the industry standard. Dreamdata: "Attribution is done on session level"
+  ([What is a session?](https://docs.dreamdata.io/article/q8lw5qwdt8-what-is-a-session));
+  GA4: sessions "aren't restarted at midnight or when new campaign parameters are
+  encountered" ([Comparing metrics](https://support.google.com/analytics/answer/11986666)).
+  Matching it keeps our numbers comparable with Dreamdata's. It also fixes M3 counting a
+  reload of a UTM landing page as a second touch.
+- **Unchanged:** stitching (16), dedup (18), clock skew (19), HTTP 200 (20), one dataset (21).
+
+Edge cases, checked against the docs (details and quotes in `docs/contract.md`, assumption 17):
+exactly 30:00 starts a new session (Dreamdata's "less than 30 minutes"; GA4 would keep it in
+the session, a one-tick difference); midnight never splits a session (GA4); each browser
+(`anonymousId`) has its own sessions, so two devices are two sessions (GA4; Dreamdata silent);
+the stitched anonymous views and the identified views of the same browser are one session
+(GA4); track and identify events keep a session alive. Known search engines are not mapped to
+`organic` yet. Implemented in `contracts/touchpoints.py`; fixture in
+`sample_data/events/README.md`.
+
 ## 2026-10-29 — Event identity, visits and time (M2 assumptions 16–21)
 
 [#5](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/5)
 
 - **Stitching (16):** an identify links the visitor's earlier `anonymousId` page views to its
   `userId` (the `contact_id`), so the visit that carried the UTMs reaches the contact.
-- **Visits (17):** only page views that start a visit (30-minute inactivity gap, new campaign
+- **Visits (17, superseded by #7 above):** only page views that start a visit (30-minute inactivity gap, new campaign
   or new referrer) or carry campaign data become touchpoints. Internal navigation does not.
 - **Clock skew (19):** event time is corrected with `receivedAt − sentAt`, as RudderStack
   does. Missing `sentAt` falls back to the browser clock with a `CLOCK_SKEW_NOT_CORRECTED`

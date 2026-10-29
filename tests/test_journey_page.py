@@ -115,23 +115,31 @@ def upload(client, **files):
     return client.post("/import/", {**data, "action": "upload"})
 
 
-def test_stitched_landing_visit_gets_the_credit(client):
-    Workspace.objects.create(name="demo", write_key=KEY)
+def landing_view(message_id, at):
     landing = "https://www.acme.example/pricing?utm_source=google&utm_medium=cpc&utm_campaign=oct"
-    post_event(client, {
-        "type": "page", "messageId": "e2e-1", "anonymousId": "anon-e2e",
-        "timestamp": "2026-10-01T10:00:00Z",
+    return {
+        "type": "page", "messageId": message_id, "anonymousId": "anon-e2e",
+        "timestamp": f"2026-10-01T{at}Z",
         "context": {"page": {"url": landing, "referrer": "https://www.google.com/"},
                     "campaign": {"source": "google", "medium": "cpc", "name": "oct"}},
-    })  # fmt: skip
+    }  # fmt: skip
+
+
+def test_stitched_landing_session_gets_the_credit(client):
+    # The M3 live flow: anonymous UTM view -> reload -> back -> identify -> opportunity.
+    # Decision #7: all of it is one session, so one credited touch with its views nested.
+    Workspace.objects.create(name="demo", write_key=KEY)
+    post_event(client, landing_view("e2e-1", "10:00:00"))
+    post_event(client, landing_view("e2e-2", "10:00:30"))  # reload: same URL, same UTMs
     post_event(client, {
-        "type": "page", "messageId": "e2e-2", "anonymousId": "anon-e2e",
+        "type": "page", "messageId": "e2e-3", "anonymousId": "anon-e2e",
         "timestamp": "2026-10-01T10:02:00Z",
         "context": {"page": {"url": "https://www.acme.example/features",
-                             "referrer": landing}, "campaign": {}},
+                             "referrer": "https://www.acme.example/pricing"}, "campaign": {}},
     })  # fmt: skip
+    post_event(client, landing_view("e2e-4", "10:03:00"))  # back to the landing page
     post_event(client, {
-        "type": "identify", "messageId": "e2e-3", "anonymousId": "anon-e2e",
+        "type": "identify", "messageId": "e2e-5", "anonymousId": "anon-e2e",
         "userId": "con-e2e", "timestamp": "2026-10-01T10:05:00Z",
     })  # fmt: skip
     response = upload(
@@ -149,15 +157,20 @@ def test_stitched_landing_visit_gets_the_credit(client):
 
     view = journey_view(Opportunity.objects.get(external_id="opp-e2e"))
     assert statuses(view) == [
-        ("e2e-1", "credited", Decimal("5000.00")),  # the anonymous landing view, stitched
-        ("e2e-2", "internal", None),  # internal navigation: shown, never a touchpoint
+        ("e2e-1", "credited", Decimal("5000.00")),  # the session, credited to its first view
+        ("e2e-2", "in_session", None),  # its page views: shown, never counted again
+        ("e2e-3", "in_session", None),
+        ("e2e-4", "in_session", None),
     ]
+    assert [r.session_id for r in view.rows] == ["e2e-1"] * 4
     assert view.rows[0].stitched_from == "anon-e2e"
+    assert view.eligible_count == 1
     html = client.get("/opportunities/opp-e2e/journey/").content.decode()
     assert "First-touch gives the full 5000.00 USD to" in html
     assert "It is the only eligible touch in the window." in html
     assert "linked by an identify of" in html and "anon-e2e" in html
-    assert "Same visit, no campaign data: internal navigation." in html
+    assert "Session 1 · 4 page views" in html
+    assert "Part of session 1, started by touch #1; not counted again." in html
 
 
 def test_contact_without_touches_says_so(client, sample):

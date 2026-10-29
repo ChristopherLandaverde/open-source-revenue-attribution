@@ -64,21 +64,8 @@
       "landing_page": "https://www.acme.example/pricing?utm_source=google&utm_medium=cpc&utm_campaign=fall-search&utm_content=ad-b&utm_term=revenue%20attribution",
       "referrer": "https://www.google.com/",
       "stitched_from": "anon-li-1",
-      "visit_rule": "FIRST_VISIT"
-    },
-    {
-      "touchpoint_id": "evt-03",
-      "contact_id": "con-nw-li",
-      "occurred_at": "2026-09-02T08:15:00+00:00",
-      "source": "google",
-      "medium": "cpc",
-      "campaign": "fall-search",
-      "content": "ad-b",
-      "term": "revenue attribution",
-      "landing_page": "https://www.acme.example/pricing?utm_source=google&utm_medium=cpc&utm_campaign=fall-search&utm_content=ad-b&utm_term=revenue%20attribution",
-      "referrer": "https://www.google.com/",
-      "stitched_from": "",
-      "visit_rule": "CAMPAIGN_DATA"
+      "visit_rule": "FIRST_SESSION",
+      "session_id": "evt-01"
     },
     {
       "touchpoint_id": "evt-10",
@@ -92,7 +79,8 @@
       "landing_page": "https://www.acme.example/customers?utm_source=linkedin&utm_medium=paid-social&utm_campaign=fall-abm",
       "referrer": "https://www.linkedin.com/",
       "stitched_from": "",
-      "visit_rule": "NEW_CAMPAIGN"
+      "visit_rule": "NEW_DEVICE",
+      "session_id": "evt-10"
     },
     {
       "touchpoint_id": "evt-13",
@@ -106,7 +94,8 @@
       "landing_page": "https://www.acme.example/pricing",
       "referrer": "",
       "stitched_from": "",
-      "visit_rule": "INACTIVITY"
+      "visit_rule": "INACTIVITY",
+      "session_id": "evt-13"
     },
     {
       "touchpoint_id": "evt-07",
@@ -120,32 +109,9 @@
       "landing_page": "https://www.acme.example/blog/audit-trails?utm_source=newsletter&utm_medium=email&utm_campaign=sept-digest",
       "referrer": "",
       "stitched_from": "",
-      "visit_rule": "FIRST_VISIT"
-    },
-    {
-      "touchpoint_id": "evt-12",
-      "contact_id": "con-ke-otto",
-      "occurred_at": "2026-09-03T09:10:00+00:00",
-      "source": "",
-      "medium": "",
-      "campaign": "",
-      "content": "",
-      "term": "",
-      "landing_page": "https://www.acme.example/security",
-      "referrer": "https://duckduckgo.com/",
-      "stitched_from": "",
-      "visit_rule": "NEW_REFERRER"
+      "visit_rule": "FIRST_SESSION",
+      "session_id": "evt-07"
     }
-  ],
-  "internal_views": [
-    [
-      "evt-05",
-      "con-nw-li"
-    ],
-    [
-      "evt-11",
-      "con-ke-otto"
-    ]
   ],
   "skipped": [
     {
@@ -153,12 +119,16 @@
       "reason": "NOT_A_PAGE_VIEW"
     },
     {
+      "event_id": "evt-03",
+      "reason": "SAME_SESSION"
+    },
+    {
       "event_id": "evt-04",
       "reason": "NOT_A_PAGE_VIEW"
     },
     {
       "event_id": "evt-05",
-      "reason": "INTERNAL_NAVIGATION"
+      "reason": "SAME_SESSION"
     },
     {
       "event_id": "evt-06",
@@ -166,7 +136,11 @@
     },
     {
       "event_id": "evt-11",
-      "reason": "INTERNAL_NAVIGATION"
+      "reason": "SAME_SESSION"
+    },
+    {
+      "event_id": "evt-12",
+      "reason": "SAME_SESSION"
     },
     {
       "event_id": "evt-14",
@@ -180,5 +154,23 @@
       "event_id": "evt-16",
       "reason": "NOT_A_PAGE_VIEW"
     }
+  ],
+  "session_views": [
+    [
+      "evt-03",
+      "evt-01"
+    ],
+    [
+      "evt-05",
+      "evt-01"
+    ],
+    [
+      "evt-11",
+      "evt-07"
+    ],
+    [
+      "evt-12",
+      "evt-07"
+    ]
   ]
 }

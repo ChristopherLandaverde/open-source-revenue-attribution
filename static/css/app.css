@@ -151,4 +151,7 @@ pre code { font-size: var(--text-small); }
 tfoot th, tfoot td { font-weight: 600; border-top: 1px solid var(--ink-primary); border-bottom: none; }
 tfoot th { text-align: right; }
 .journey-table { min-width: 60rem; }  /* scrolls sideways on phones instead of 1-word columns */
+/* #7: a session's later page views sit under its touch, indented and quieter. */
+.journey-table tr.in-session td { color: var(--ink-secondary); background: var(--surface-raised); padding-top: var(--space-1); padding-bottom: var(--space-1); }
+.journey-table tr.in-session td:nth-child(3) { padding-left: var(--space-5); }
 .nowrap { white-space: nowrap; }

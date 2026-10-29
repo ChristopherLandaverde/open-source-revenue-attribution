@@ -24,7 +24,9 @@ SKIP_TEXT = {
     SkipReason.CONTACT_NOT_IMPORTED: (
         "userId is not an imported contact_id. Import the contact; it converts then."
     ),
-    SkipReason.INTERNAL_NAVIGATION: "Same visit and no campaign data: internal navigation.",
+    SkipReason.SAME_SESSION: (
+        "A later page view of a session; the session counts once, as its first page view."
+    ),
     SkipReason.AMBIGUOUS_IDENTITY: (
         "This anonymousId was identified as more than one contact, so it is not linked."
     ),

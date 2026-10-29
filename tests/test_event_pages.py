@@ -44,11 +44,11 @@ def test_events_page_shows_outcomes(client, workspace):
     send(client)
     html = client.get("/events/").content.decode()
     assert "1 event payload refused. 14 events accepted." in html
-    assert "6 became touchpoints" in html
+    assert "4 became touchpoints" in html  # one per session (#7)
     assert "TIMESTAMP_WITHOUT_TIMEZONE" in html
     assert "Add the UTC offset" in html  # the fix
     assert "linked to con-nw-li" in html  # evt-01, stitched by identify
-    assert "Same visit and no campaign data: internal navigation." in html  # evt-05
+    assert "the session counts once, as its first page view" in html  # evt-03, evt-05
     assert "identified as more than one contact" in html  # evt-14
     assert "skew-corrected" in html and "browser clock" in html  # evt-07, evt-12
 
