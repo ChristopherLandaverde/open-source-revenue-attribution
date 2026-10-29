@@ -9,7 +9,7 @@
   rule, not causal impact.
 </p>
 
-<form class="controls" hx-get="{% url 'reports:journey' view.opportunity.external_id %}" hx-target="#results"
+<form class="controls" hx-get="{% url 'reports:journey' view.opportunity.external_id %}" hx-target="#results" hx-indicator="#results"
       hx-swap="outerHTML" hx-trigger="change" hx-push-url="true">
   <fieldset>
     <legend>Amount to attribute</legend>

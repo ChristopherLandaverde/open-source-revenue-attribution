@@ -140,7 +140,7 @@ pre { background: var(--surface-raised); border-radius: var(--radius-md); paddin
 pre code { font-size: var(--text-small); }
 
 /* HTMX loading */
-.htmx-request #results, .htmx-request #issues { opacity: 0.6; transition: opacity var(--transition); }
+#results.htmx-request, #issues.htmx-request { opacity: 0.6; transition: opacity var(--transition); }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
@@ -150,3 +150,5 @@ pre code { font-size: var(--text-small); }
 /* Journey totals */
 tfoot th, tfoot td { font-weight: 600; border-top: 1px solid var(--ink-primary); border-bottom: none; }
 tfoot th { text-align: right; }
+.journey-table { min-width: 60rem; }  /* scrolls sideways on phones instead of 1-word columns */
+.nowrap { white-space: nowrap; }

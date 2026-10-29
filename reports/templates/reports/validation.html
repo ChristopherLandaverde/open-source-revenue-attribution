@@ -64,7 +64,7 @@
   </table>
   </div>
 
-  <form class="controls" hx-get="{% url 'reports:validation' %}" hx-target="#issues" hx-swap="outerHTML"
+  <form class="controls" hx-get="{% url 'reports:validation' %}" hx-target="#issues" hx-indicator="#issues" hx-swap="outerHTML"
         hx-trigger="change" hx-push-url="true">
     <fieldset>
       <legend>Show</legend>

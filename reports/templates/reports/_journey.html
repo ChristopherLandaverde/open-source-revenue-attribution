@@ -8,11 +8,15 @@
       <p class="verdict"><span class="tag tag-accepted">✓ Credited</span>
         {{ view.model_name }} gives the full {{ amount }} {{ opp.currency }} to <span class="mono">{{ step.touchpoint.id }}</span>
         (<span class="mono">{{ step.touchpoint.campaign_key }}</span>).</p>
-      <p class="context">It is the earliest of {{ view.eligible_count }} eligible touch{{ view.eligible_count|pluralize:"es" }} in the window.</p>
+      <p class="context">{% if view.eligible_count == 1 %}It is the only eligible touch in the window.{% else %}It is the earliest of {{ view.eligible_count }} eligible touches in the window.{% endif %}</p>
     {% elif not opp.contact %}
       <p class="verdict"><span class="tag tag-review">! Unattributed</span>
         No contact on this opportunity, so the full {{ amount }} {{ opp.currency }} is Unattributed.</p>
       <p class="context">Add its <code>contact_id</code> to opportunities.csv and re-import to credit that contact's touches.</p>
+    {% elif not view.rows %}
+      <p class="verdict"><span class="tag tag-review">! Unattributed</span>
+        <span class="mono">{{ opp.contact.external_id }}</span> has no touches, so the full {{ amount }} {{ opp.currency }} is Unattributed.</p>
+      <p class="context">Import touchpoints.csv rows or send page events for this contact.</p>
     {% else %}
       <p class="verdict"><span class="tag tag-review">! Unattributed</span>
         No touch of <span class="mono">{{ opp.contact.external_id }}</span> is in the {{ view.lookback_days }}-day window, so the full {{ amount }} {{ opp.currency }} is Unattributed.</p>
@@ -29,7 +33,7 @@
       <dt class="label">Contact</dt>
       <dd>{% if opp.contact %}<span class="mono">{{ opp.contact.external_id }}</span>, the opportunity's <code>contact_id</code>; only this contact's touches count{% else %}None{% endif %}</dd>
       <dt class="label">Conversion</dt>
-      <dd><span class="mono">{{ journey.conversion.converted_at|date:"Y-m-d H:i" }} UTC</span> ({{ view.metric_label|lower }})</dd>
+      <dd><span class="mono">{{ journey.conversion.converted_at|date:"Y-m-d H:i" }} UTC</span> · {{ view.metric_label }}</dd>
       <dt class="label">Window</dt>
       <dd><span class="mono">{{ journey.window_start|date:"Y-m-d H:i" }} → {{ journey.conversion.converted_at|date:"Y-m-d H:i" }} UTC</span>: {{ view.lookback_days }} days, both ends included</dd>
       <dt class="label">Model</dt>
@@ -39,7 +43,7 @@
     {% if view.rows %}
     <h2>Touches of <span class="mono">{{ opp.contact.external_id }}</span> <span class="muted">(oldest first)</span></h2>
     <div class="table-wrap">
-    <table>
+    <table class="journey-table">
       <thead><tr>
         <th scope="col" class="num">#</th><th scope="col">Time (UTC)</th><th scope="col">Touch</th>
         <th scope="col">Source / medium / campaign</th><th scope="col">How it became a touch</th>
@@ -50,7 +54,7 @@
         <tr>
           <td class="num">{{ row.position|default:"—" }}</td>
           <td class="mono">{{ row.occurred_at|date:"Y-m-d H:i:s" }}</td>
-          <td><span class="mono">{{ row.touchpoint_id }}</span><br><span class="small muted">{% if row.origin == "csv" %}touchpoints.csv{% else %}page event{% endif %}</span></td>
+          <td><span class="mono nowrap">{{ row.touchpoint_id }}</span><br><span class="small muted">{% if row.origin == "csv" %}touchpoints.csv{% else %}page event{% endif %}</span></td>
           <td><span class="mono">{{ row.campaign_key }}</span>{% if row.landing_page %}<br><span class="small muted mono">{{ row.landing_page|truncatechars:60 }}</span>{% endif %}</td>
           <td>{{ row.how }}{% if row.stitched_from %}<br><span class="small">Anonymous view, linked by an identify of <span class="mono">{{ row.stitched_from }}</span>.</span>{% endif %}</td>
           <td><span class="tag {{ row.status_class }}">{{ row.status_label }}</span><br><span class="small">{{ row.window_text }}</span></td>

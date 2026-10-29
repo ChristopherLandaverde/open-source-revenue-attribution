@@ -67,6 +67,7 @@ def test_journey_page_renders_the_audit_chain(client, sample):
     html = client.get("/opportunities/opp-101/journey/").content.decode()
     assert "First-touch gives the full 24000.00 USD to" in html
     assert "earliest of 2 eligible touches" in html
+    assert "2026-04-01 12:00 UTC</span> · Pipeline (credited at opportunity creation)" in html
     assert "2026-01-01 12:00 → 2026-04-01 12:00 UTC" in html
     assert "After the conversion time." in html
     assert "not causal impact" in html
@@ -154,5 +155,19 @@ def test_stitched_landing_visit_gets_the_credit(client):
     assert view.rows[0].stitched_from == "anon-e2e"
     html = client.get("/opportunities/opp-e2e/journey/").content.decode()
     assert "First-touch gives the full 5000.00 USD to" in html
+    assert "It is the only eligible touch in the window." in html
     assert "linked by an identify of" in html and "anon-e2e" in html
     assert "Same visit, no campaign data: internal navigation." in html
+
+
+def test_contact_without_touches_says_so(client, sample):
+    from reports.models import Account, Contact
+
+    contact = Contact.objects.create(external_id="con-new", account=Account.objects.first())
+    Opportunity.objects.create(
+        external_id="opp-new", account=contact.account, contact=contact, amount=Decimal("10.00"),
+        currency="USD", stage="open", created_at="2026-05-01T00:00:00Z",
+    )  # fmt: skip
+    html = client.get("/opportunities/opp-new/journey/").content.decode()
+    assert "has no touches, so the full 10.00 USD is Unattributed." in html
+    assert "No touches recorded for" in html
