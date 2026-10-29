@@ -1,0 +1,70 @@
+<section id="results" aria-live="polite">
+  {% with fix=view.to_fix skipped=view.not_checked ready=view.ready %}
+  {% if fix %}
+    <p class="verdict"><span class="tag tag-review">! Fix data first</span>
+      {{ fix|length }} check{{ fix|length|pluralize:" needs,s need" }} a fix before you trust the numbers.</p>
+  {% elif ready %}
+    <p class="verdict"><span class="tag tag-accepted">✓ Ready</span>
+      Every check that could run passed{% if skipped %}; {{ skipped|length }} could not run yet{% endif %}.</p>
+  {% else %}
+    <p class="verdict"><span class="tag tag-neutral">– Not checked</span>
+      No check could run yet: there is no data to check.</p>
+    <p>Import CSVs on the <a href="{% url 'reports:import' %}">Import CSV</a> page, or run <code>uv run python manage.py load_sample_data</code>.</p>
+  {% endif %}
+  <p class="context small">
+    Amount: {{ view.metric_label }} · {{ view.lookback_days }}-day lookback ·
+    {{ view.attributable }} of {{ view.opportunities }} opportunities have an eligible touch
+    {% if view.touch_period %} · touches from <span class="mono">{{ view.touch_period.0|date:"Y-m-d" }}</span> to <span class="mono">{{ view.touch_period.1|date:"Y-m-d" }}</span>{% endif %}
+    {% if view.conversion_period %} · conversions from <span class="mono">{{ view.conversion_period.0|date:"Y-m-d" }}</span> to <span class="mono">{{ view.conversion_period.1|date:"Y-m-d" }}</span>{% endif %}
+  </p>
+  {% endwith %}
+
+  {% if view.to_fix %}
+  <h2>To fix, in the order the data flows</h2>
+  <ol class="findings">
+  {% for check in view.to_fix %}
+    <li class="finding">
+      <p class="finding-head"><span class="tag {{ check.css }}">{{ check.label }}</span> <strong>{{ check.title }}</strong>
+        <span class="mono small">{{ check.count }} / {{ check.total }}{% if check.percent is not None %} · {{ check.percent }}%{% endif %}</span></p>
+      <dl class="codes">
+        <dt class="label">Seen</dt><dd>{{ check.finding }}</dd>
+        <dt class="label">Why</dt><dd>{{ check.impact }}</dd>
+        <dt class="label">Fix</dt><dd>{{ check.fix }}</dd>
+        <dt class="label">Verify</dt><dd>{{ check.verify }}</dd>
+        {% if check.examples %}<dt class="label">Records</dt><dd class="mono">{{ check.examples|join:", " }}{% if check.link %} · <a class="sans" href="{% url check.link %}">Open evidence</a>{% endif %}</dd>{% endif %}
+      </dl>
+    </li>
+  {% endfor %}
+  </ol>
+  {% endif %}
+
+  {% if view.not_checked %}
+  <h2>Not checked</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th scope="col">Check</th><th scope="col">Status</th><th scope="col">Why it could not run</th></tr></thead>
+    <tbody>
+    {% for check in view.not_checked %}
+      <tr><td>{{ check.title }}</td><td><span class="tag {{ check.css }}">{{ check.label }}</span></td><td>{{ check.finding }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
+  {% if view.ready %}
+  <details class="passes">
+    <summary>Show {{ view.ready|length }} passing check{{ view.ready|length|pluralize }}</summary>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th scope="col">Check</th><th scope="col">Status</th><th scope="col" class="num">Count</th><th scope="col">Seen</th></tr></thead>
+      <tbody>
+      {% for check in view.ready %}
+        <tr><td>{{ check.title }}</td><td><span class="tag {{ check.css }}">{{ check.label }}</span></td><td class="num">{{ check.count }} / {{ check.total }}</td><td>{{ check.finding }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
+  {% endif %}
+</section>

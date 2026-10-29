@@ -155,3 +155,15 @@ tfoot th { text-align: right; }
 .journey-table tr.in-session td { color: var(--ink-secondary); background: var(--surface-raised); padding-top: var(--space-1); padding-bottom: var(--space-1); }
 .journey-table tr.in-session td:nth-child(3) { padding-left: var(--space-5); }
 .nowrap { white-space: nowrap; }
+
+/* Model comparison and data readiness (M4) */
+.compare-table { min-width: 52rem; }
+.compare-table tbody th { font-weight: 400; text-align: left; }
+.compare-table .influence { border-left: 2px solid var(--line-control); }
+.compare-table tfoot th, .compare-table tfoot td { font-weight: 600; }
+.findings { list-style: none; padding: 0; margin: 0 0 var(--space-5); }
+.finding { padding: var(--space-3) 0; border-top: 1px solid var(--line-subtle); }
+.finding-head { margin-bottom: var(--space-2); }
+.passes { margin: var(--space-4) 0; }
+.passes summary { cursor: pointer; font-weight: 600; padding: var(--space-1) 0; }
+.sans { font-family: var(--font-sans); }

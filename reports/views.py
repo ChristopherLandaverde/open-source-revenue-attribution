@@ -8,10 +8,11 @@ from contracts import ImportBatch
 from reports.forms import ImportForm
 from reports.imports import run_import
 from reports.models import ImportRun, Opportunity
+from reports.readiness import readiness as readiness_view
 from reports.services import (
     ISSUE_VIEWS,
     METRICS,
-    first_touch_report,
+    comparison_report,
     journey_view,
     validation_view,
 )
@@ -20,12 +21,29 @@ DEMO_PATH = Path(settings.BASE_DIR) / "sample_data" / "demo"
 
 
 def report(request):
+    """Every standard model's credit per campaign, side by side, beside the influenced amount."""
     metric = request.GET.get("metric", "pipeline")
     if metric not in METRICS:
         return HttpResponseBadRequest("Unknown metric.")
-    context = {"report": first_touch_report(metric), "metrics": METRICS}
+    context = {
+        "report": comparison_report(metric),
+        "readiness": readiness_view(metric),
+        "metrics": METRICS,
+    }
     template = (
         "reports/_results.html" if request.headers.get("HX-Request") else "reports/report.html"
+    )
+    return render(request, template, context)
+
+
+def readiness(request):
+    """What to fix in the data before trusting the numbers, check by check."""
+    metric = request.GET.get("metric", "pipeline")
+    if metric not in METRICS:
+        return HttpResponseBadRequest("Unknown metric.")
+    context = {"view": readiness_view(metric), "metrics": METRICS}
+    template = (
+        "reports/_readiness.html" if request.headers.get("HX-Request") else "reports/readiness.html"
     )
     return render(request, template, context)
 

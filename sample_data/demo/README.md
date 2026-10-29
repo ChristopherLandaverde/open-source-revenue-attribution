@@ -95,3 +95,36 @@ win `opp-106` instead: the fixture fails if timezones are mishandled.
 
 Every opportunity's credits sum to its amount (first-touch gives the whole amount to one
 touchpoint or to Unattributed), so totals reconcile with no rounding.
+
+## Model comparison (expected/models.json)
+
+Same windows and eligible touches as above. Only three conversions have more than one eligible
+touch, so only they differ between models; every other opportunity gives its whole amount to
+its single touch (or to Unattributed) under every model. Leftover cents go to the largest
+remainder, ties to the earlier touch ([`allocate`](../../attribution/types.py)).
+
+| Conversion | Eligible touches, oldest first | First | Last | Linear | Position-based 40/20/40 | Time decay, 7-day half-life |
+|---|---|---|---|---|---|---|
+| opp-101 pipeline, 24,000.00 USD | tp-01 q1-search (49 d 22 h before), tp-02 abm-launch (27 d 2 h) | tp-01 | tp-02 | 12,000.00 each | two touches: 12,000.00 each | weights 2^(−49.917/7) = 0.0071346, 2^(−27.083/7) = 0.0684385 → 2,265.757… and 21,734.243… → floors 2,265.75 + 21,734.24 = 23,999.99; the cent goes to tp-01 (remainder 0.71 vs 0.29 of a cent): **2,265.76 / 21,734.24** |
+| opp-103 pipeline, 15,000.00 USD | tp-07 q1-search, tp-08 abm-launch (same instant, ID order) | tp-07 | tp-08 | 7,500.00 each | 7,500.00 each | equal ages → 7,500.00 each |
+| opp-103 won, 15,000.00 USD | tp-07, tp-08 (70 d 0.5 h before), tp-09 (none) (28 d 23 h) | tp-07 | tp-09 | 5,000.00 each | 6,000.00 / 3,000.00 / 6,000.00 | weights 0.00097455, 0.00097455, 0.05684177 → 248.648…, 248.648…, 14,502.703… → floors sum 14,999.98; 2 cents to tp-07 and tp-08 (remainder 0.83 each vs 0.34): **248.65 / 248.65 / 14,502.70** |
+
+**Influenced** counts each opportunity's full amount once for every campaign with at least one
+eligible touch, so it overlaps: pipeline USD influenced sums to 39,000 + 39,000 + 6,000 + 9,000
+= 93,000.00 against 54,000.00 of pipeline. Every model column sums to 54,000.00.
+
+Pipeline, USD (First / Last / Linear / Position / Time decay · Influenced):
+
+- google / cpc / q1-search: 39,000.00 / 0 / 19,500.00 / 19,500.00 / 9,765.76 (2,265.76 + 7,500) · 39,000.00 (opp-101, opp-103)
+- linkedin / paid-social / abm-launch: 0 / 39,000.00 / 19,500.00 / 19,500.00 / 29,234.24 (21,734.24 + 7,500) · 39,000.00
+- newsletter / email / april-digest: 6,000.00 under every model · 6,000.00
+- Unattributed (opp-104, no contact): 9,000.00 under every model · 9,000.00
+- EUR and JPY: one touch each, so the first-touch amounts under every model.
+
+Won, USD:
+
+- partner / referral / may-webinar: 24,000.00 under every model (opp-101's only touch) · 24,000.00
+- (none) / (none) / (none): 0 / 15,000.00 / 5,000.00 / 6,000.00 / 14,502.70 · 15,000.00
+- google / cpc / q1-search: 15,000.00 / 0 / 5,000.00 / 6,000.00 / 248.65 · 15,000.00
+- linkedin / paid-social / abm-launch: 0 / 0 / 5,000.00 / 3,000.00 / 248.65 · 15,000.00
+- Each column sums to 39,000.00. EUR: (none) / (none) / (none) 18,500.50 under every model.

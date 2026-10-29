@@ -1,0 +1,44 @@
+{
+  "_about": "Hand-calculated credit per campaign under every standard model, plus the influenced amount, for the accepted rows of sample_data/demo with a 90-day inclusive lookback. Column order: First-touch, Last-touch, Linear, Position-based (U-shaped), Time decay (7-day half-life). Derivation in ../README.md (Model comparison).",
+  "models": ["First-touch", "Last-touch", "Linear", "Position-based (U-shaped)", "Time decay"],
+  "pipeline": {
+    "EUR": {
+      "total": "18500.50",
+      "rows": [
+        ["linkedin / (none) / (none)", ["18500.50", "18500.50", "18500.50", "18500.50", "18500.50"], "18500.50", 1]
+      ]
+    },
+    "JPY": {
+      "total": "1200000",
+      "rows": [
+        ["event / trade-show / robotics-expo", ["1200000", "1200000", "1200000", "1200000", "1200000"], "1200000", 1]
+      ]
+    },
+    "USD": {
+      "total": "54000.00",
+      "rows": [
+        ["google / cpc / q1-search", ["39000.00", "0", "19500.00", "19500.00", "9765.76"], "39000.00", 2],
+        ["linkedin / paid-social / abm-launch", ["0", "39000.00", "19500.00", "19500.00", "29234.24"], "39000.00", 2],
+        ["newsletter / email / april-digest", ["6000.00", "6000.00", "6000.00", "6000.00", "6000.00"], "6000.00", 1],
+        ["Unattributed", ["9000.00", "9000.00", "9000.00", "9000.00", "9000.00"], "9000.00", 1]
+      ]
+    }
+  },
+  "won": {
+    "EUR": {
+      "total": "18500.50",
+      "rows": [
+        ["(none) / (none) / (none)", ["18500.50", "18500.50", "18500.50", "18500.50", "18500.50"], "18500.50", 1]
+      ]
+    },
+    "USD": {
+      "total": "39000.00",
+      "rows": [
+        ["partner / referral / may-webinar", ["24000.00", "24000.00", "24000.00", "24000.00", "24000.00"], "24000.00", 1],
+        ["(none) / (none) / (none)", ["0", "15000.00", "5000.00", "6000.00", "14502.70"], "15000.00", 1],
+        ["google / cpc / q1-search", ["15000.00", "0", "5000.00", "6000.00", "248.65"], "15000.00", 1],
+        ["linkedin / paid-social / abm-launch", ["0", "0", "5000.00", "3000.00", "248.65"], "15000.00", 1]
+      ]
+    }
+  }
+}
