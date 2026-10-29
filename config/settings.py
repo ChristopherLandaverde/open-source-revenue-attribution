@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "reports",
+    "collection",
 ]
 
 MIDDLEWARE = [
@@ -75,3 +76,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Attribution lookback window in days (PRD section 6 demo default).
 ATTRIBUTION_LOOKBACK_DAYS = env.int("ATTRIBUTION_LOOKBACK_DAYS", default=90)
+
+# Event collection (collection/). Most events accepted in one /v1/batch request.
+COLLECT_MAX_BATCH = env.int("COLLECT_MAX_BATCH", default=500)
+# The SDK demo page at /events/demo/ sends synthetic events into the dataset; off unless DEBUG.
+COLLECT_DEMO_PAGE = env.bool("COLLECT_DEMO_PAGE", default=DEBUG)

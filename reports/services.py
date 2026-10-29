@@ -4,10 +4,11 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from django.conf import settings
+from django.db.models import Prefetch
 
 import attribution
 from contracts import RejectReason, WarningCode
-from reports.models import ImportRun, Opportunity
+from reports.models import ImportRun, Opportunity, Touchpoint
 
 METRICS = {
     "pipeline": "Pipeline (credited at opportunity creation)",
@@ -58,8 +59,10 @@ def first_touch_report(metric: str = "pipeline") -> Report:
     if metric not in METRICS:
         raise ValueError(f"Unknown metric: {metric}")
     model = attribution.FirstTouch(lookback_days=settings.ATTRIBUTION_LOOKBACK_DAYS)
+    # Touchpoints from CSV and from events can share an ID; a fixed order keeps ties stable.
+    touchpoints = Touchpoint.objects.order_by("occurred_at", "external_id", "origin")
     opportunities = Opportunity.objects.select_related("account", "contact").prefetch_related(
-        "contact__touchpoints"
+        Prefetch("contact__touchpoints", queryset=touchpoints)
     )
     if metric == "won":
         opportunities = opportunities.filter(stage=Opportunity.Stage.WON)

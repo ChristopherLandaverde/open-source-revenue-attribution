@@ -3,16 +3,16 @@
 Defaults to the synthetic demo fixture in sample_data/demo/. Rows the validator rejects are
 never loaded; each one is listed with its reason code. With --strict, any rejection refuses
 the whole import. Idempotent: re-running updates rows by their IDs.
+After a load, collected page events whose contact now exists become touchpoints.
 """
 
 from pathlib import Path
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
 
-from contracts import ImportBatch, ImportReport, validate_import
-from reports.models import Account, Contact, ImportRun, Opportunity, Touchpoint
+from contracts import ImportBatch, ImportReport
+from reports.imports import run_import
 
 DEFAULT_PATH = Path(settings.BASE_DIR) / "sample_data" / "demo"
 
@@ -42,32 +42,14 @@ class Command(BaseCommand):
     def handle(self, *args, path, strict, **options):
         if not path.is_dir():
             raise CommandError(f"{path} is not a directory of import CSV files.")
-        lookback = settings.ATTRIBUTION_LOOKBACK_DAYS
-        report = validate_import(ImportBatch.from_csv_dir(path), lookback_days=lookback)
         source = display_path(path)
+        result = run_import(ImportBatch.from_csv_dir(path), source=source, strict=strict)
+        report = result.report
         self._describe(report, source)
-
-        if strict and not report.ok:
-            ImportRun.objects.create(
-                source=source,
-                lookback_days=lookback,
-                strict=True,
-                loaded=False,
-                report=report.to_dict(),
-            )
+        if not result.run.loaded:
             raise CommandError(
-                f"Refused the whole import (--strict): {self._refused(report)} rows or files "
+                f"Refused the whole import (--strict): {result.refused} rows or files "
                 "failed validation. Nothing was loaded. Fix the rows listed above and re-run."
-            )
-
-        with transaction.atomic():
-            self._load(report)
-            ImportRun.objects.create(
-                source=source,
-                lookback_days=lookback,
-                strict=strict,
-                loaded=True,
-                report=report.to_dict(),
             )
         loaded = {e: len(r) for e, r in report.accepted.items()}
         self.stdout.write(
@@ -77,10 +59,6 @@ class Command(BaseCommand):
                 f"from {source}. Full validation report: /validation/"
             )
         )
-
-    @staticmethod
-    def _refused(report: ImportReport) -> int:
-        return len(report.rejected) + len(report.file_errors)
 
     def _describe(self, report: ImportReport, source: str) -> None:
         counts = report.counts.values()
@@ -104,48 +82,3 @@ class Command(BaseCommand):
                         f"  {issue.file} row {issue.row} [{row.record_id or 'no id'}]: "
                         f"{issue.code} {issue.field} - {issue.message}"
                     )
-
-    @staticmethod
-    def _load(report: ImportReport) -> None:
-        accounts = {
-            rec.account_id: Account.objects.update_or_create(
-                external_id=rec.account_id, defaults={"name": rec.name, "domain": rec.domain}
-            )[0]
-            for rec in report.accepted["accounts"]
-        }
-        contacts = {
-            rec.contact_id: Contact.objects.update_or_create(
-                external_id=rec.contact_id,
-                defaults={"account": accounts[rec.account_id], "email": rec.email},
-            )[0]
-            for rec in report.accepted["contacts"]
-        }
-        for rec in report.accepted["opportunities"]:
-            Opportunity.objects.update_or_create(
-                external_id=rec.opportunity_id,
-                defaults={
-                    "account": accounts[rec.account_id],
-                    "contact": contacts[rec.contact_id] if rec.contact_id else None,
-                    "name": rec.name,
-                    "amount": rec.amount,
-                    "currency": rec.currency,
-                    "stage": rec.stage,
-                    "created_at": rec.created_at,
-                    "won_at": rec.won_at,
-                },
-            )
-        for rec in report.accepted["touchpoints"]:
-            Touchpoint.objects.update_or_create(
-                external_id=rec.touchpoint_id,
-                defaults={
-                    "contact": contacts[rec.contact_id],
-                    "occurred_at": rec.occurred_at,
-                    "source": rec.source,
-                    "medium": rec.medium,
-                    "campaign": rec.campaign,
-                    "content": rec.content,
-                    "term": rec.term,
-                    "landing_page": rec.landing_page,
-                    "referrer": rec.referrer,
-                },
-            )
