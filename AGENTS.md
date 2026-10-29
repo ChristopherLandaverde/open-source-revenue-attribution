@@ -11,6 +11,7 @@ cp .env.example .env                                      # once; set DATABASE_U
 docker compose up -d --wait db                            # local Postgres
 uv run python manage.py migrate
 uv run python manage.py load_sample_data                  # idempotent
+uv run python manage.py create_workspace demo             # prints a write key for /v1/
 uv run python manage.py runserver                         # http://127.0.0.1:8000/
 
 uv run ruff check . && uv run ruff format --check .       # lint + format
@@ -31,13 +32,16 @@ no React/Vite) · Django ORM + migrations on PostgreSQL · pytest + pytest-djang
 
 - **Architecture boundary:** `attribution/` and `contracts/` are pure Python. No `django`,
   `reports`, or `config` imports (`tests/test_architecture.py` fails otherwise). Django code
-  converts records to `attribution` types in `reports/services.py`.
+  converts records to `attribution` types in `reports/services.py`. `collection/` (event
+  endpoint, storage) only persists what `contracts.validate_events` and
+  `contracts.touchpoints.events_to_touchpoints` decide; data rules never live in views.
 - **Data contract:** `docs/contract.md` is the source of truth for import/event fields and
   reason codes; `contracts/` enforces it. Reason codes are append-only. Changing what is
   accepted is a data-meaning change (needs a decision). A test fails if a code or column is
   missing from the doc.
-- **Fixture expectations** in `sample_data/demo/expected/` are hand-calculated and derived in
-  `sample_data/demo/README.md`. Never regenerate them from code output.
+- **Fixture expectations** in `sample_data/demo/expected/` and `sample_data/events/expected/`
+  are hand-calculated and derived in
+  `sample_data/*/README.md`. Never regenerate them from code output.
 - **Models are test-first** with hand-calculated expected outputs written in the test or
   fixture docs. Credits must reconcile to the opportunity amount.
 - **Copy:** reports state association under a named model and window, never causal
@@ -45,6 +49,9 @@ no React/Vite) · Django ORM + migrations on PostgreSQL · pytest + pytest-djang
 - **Data:** synthetic only (`*.example` domains). Never commit `.env` or real personal data.
 - **Changing attribution math or report meaning** needs a `needs-decision` issue first.
 - HTMX endpoints return HTML fragments; full page and fragment share one template include.
+- Every reason code needs a fix line in `reports/fixes.py` (UI copy; a test enforces it).
+- UI follows the `ux-standards` skill (Focosys tokens in `static/css/tokens.css`; no raw hex in
+  `app.css`).
 - Migrations: generate with `makemigrations`; migrations are exempt from Ruff format/E501.
 - Vendored assets: record version, source URL, license, and SHA-256 in
   `static/vendor/README.md`.

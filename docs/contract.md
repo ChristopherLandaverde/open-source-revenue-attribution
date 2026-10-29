@@ -109,9 +109,9 @@ v1; the account journey is M3.
 
 ## 3. Events (RudderStack)
 
-Events arrive from the RudderStack JavaScript SDK (`static/vendor/`). Collection and storage
-are M2; this section fixes what an event must carry to be accepted. Field names are
-RudderStack's.
+Events arrive from the RudderStack JavaScript SDK (`static/vendor/`) or any client that speaks
+RudderStack's HTTP API (see [Collection](#collection-endpoint)). This section fixes what an
+event must carry to be accepted. Field names are RudderStack's.
 
 | Field | page | track | identify | Rule |
 |---|---|---|---|---|
@@ -135,13 +135,47 @@ RudderStack's.
 - **Identity:** browsing stays anonymous (`anonymousId` only) until an identify event sends
   `userId` = `contact_id`. Nothing else links anonymous activity to a contact.
 - **Retries:** a repeat of an already-accepted `messageId` with identical content is counted
-  once (`DUPLICATE_ROW`). The same `messageId` with different content is refused
-  (`DUPLICATE_ID`); the first accepted event stands.
+  once (`DUPLICATE_ROW`), whether it arrives in the same request or a later one. The same
+  `messageId` with different content is refused (`DUPLICATE_ID`); the first accepted event
+  stands. "Identical" ignores the top-level `sentAt`, which the SDK rewrites on every delivery
+  attempt.
+- **Text limits** from the general rules apply: `context.campaign` values ≤ 200 characters,
+  page URL and referrer ≤ 500 (`VALUE_TOO_LONG`).
+- **Browser time:** the browser SDK sends `originalTimestamp` (the visitor's clock) and
+  `sentAt`, not `timestamp`; RudderStack's server normally adds `timestamp`. Events collected
+  directly from the SDK therefore use `originalTimestamp`. `sentAt` and the receive time are
+  stored so a skew correction can be added later.
 
-Turning identified page events into touchpoints (sessionisation, which page view of a visit
-counts) is M2–M3. Until then touchpoints arrive through `touchpoints.csv`.
+### Collection endpoint
+
+| | |
+|---|---|
+| Paths | `POST /v1/batch` with `{"batch": [event, ...]}` (at most `COLLECT_MAX_BATCH`, default 500), or `POST /v1/page`, `/v1/track`, `/v1/identify` with one event. The event's own `type` decides; the path does not. |
+| Auth | `Authorization: Basic base64(<write key>:)`, as the SDK sends it. A write key belongs to a workspace (`manage.py create_workspace`). Write keys are visible in browser code; they identify the sender, they are not secrets. |
+| Response | `200` with counts and one outcome per event in order: `accepted`, `duplicate` or `rejected`, with its codes. `401` missing or unknown key, `400` body is not a JSON object/batch, `413` too many events. Refused events still get `200`: the SDK does not retry 4xx, and a refused event will not become valid by retrying. |
+| Storage | Every distinct payload is stored verbatim with its outcome (`collection.CollectedEvent`). Accepted events are unique by `messageId`; refused payloads by content. Exact repeats increment a counter, so replaying the same data never adds rows. |
+| Scope | All workspaces write to one dataset (no per-workspace isolation), and `messageId` is unique across it. Same-origin only: no CORS headers yet. |
+
+### From events to touchpoints
+
+`contracts/touchpoints.py` turns accepted events into touchpoints, deterministically:
+
+| Event | Becomes |
+|---|---|
+| `page` with `userId` that is an imported `contact_id` | One touchpoint. ID = `messageId`, time = event time, UTMs from `context.campaign` (blank stays blank), `landing_page` = page URL, `referrer` as sent. |
+| `page` with no `userId` | Nothing (`ANONYMOUS`). Earlier anonymous page views are **not** linked to a contact by a later identify. |
+| `page` whose `userId` is not an imported contact | Nothing yet (`CONTACT_NOT_IMPORTED`). It converts after the import that adds the contact. |
+| `track`, `identify` | Nothing (`NOT_A_PAGE_VIEW`). Kept for the funnel (M3). |
+
+There is no sessionisation: every identified page view is a touchpoint, including internal
+page views without UTMs (shown as `(none)`). Touchpoints from events are stored with
+`origin = event` next to CSV touchpoints, and re-running the conversion updates them in place.
+The hand-calculated fixture is `sample_data/events/`.
 
 ## 4. Validation report
+
+The CSV import runs the same way from `load_sample_data` and from the **Import CSV** page
+(`/import/`): partial by default, strict on request.
 
 `validate_import` returns, per file: rows received, accepted, refused and exact duplicates
 ignored; the list of refused rows, each with **all** its reasons (code, field, message);
@@ -236,8 +270,27 @@ Choices the PRD does not make, taken conservatively. Each is a candidate for
 15. **Supported currencies** are the 20 listed above (all with 0 or 2 minor-unit digits, to fit
     the current amount column).
 
+### M2 assumptions (not yet reviewed)
+
+Taken during M2 where the contract was silent. Each changes what data means and needs
+Christopher's decision before it is treated as settled.
+
+16. **Only identified page views become touchpoints.** An identify does not retroactively link
+    earlier anonymous page views (the landing visit that carried the UTMs is lost if the visitor
+    identifies later). Retroactive stitching by `anonymousId` is a candidate for M3.
+17. **Every identified page view is a touchpoint** (no sessionisation), including internal
+    navigation without UTMs. This adds `(none) / (none) / (none)` touches that first-touch
+    can credit.
+18. **`sentAt` is transport metadata**, ignored when deciding whether a repeat is a retry.
+19. **Direct SDK events use the browser clock** (`originalTimestamp`), because the SDK sends no
+    `timestamp`; no skew correction is applied.
+20. **Refused events get HTTP 200** with per-event outcomes, not 4xx, so one bad event does not
+    fail a batch.
+21. **One dataset for all workspaces**; `messageId` deduplication is global.
+
 ## Not in v1
 
-Event collection and storage, sessionisation of page events into touchpoints, account-level
-touchpoints, stage history and `lost`/custom stages, currency conversion, import provenance
-beyond the `ImportRun` record, and deleting records that disappear from a re-import.
+Sessionisation of page events, linking anonymous history on identify, CORS for cross-site
+collection, per-workspace data isolation, account-level touchpoints, stage history and
+`lost`/custom stages, currency conversion, import provenance beyond the `ImportRun` record,
+and deleting records that disappear from a re-import.

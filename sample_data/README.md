@@ -5,4 +5,7 @@
   with hand-calculated expected validation and first-touch results in `demo/expected/` and
   their derivation in [`demo/README.md`](demo/README.md).
 
+- [`events/`](events/) — a RudderStack `/v1/batch` body with hand-derived validation outcomes
+  and touchpoints (`events/README.md`).
+
 All records are invented and use `*.example` domains. Never add real personal data here.
