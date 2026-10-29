@@ -5,7 +5,7 @@ Like attribution/, this package must not import Django or app code
 """
 
 from contracts.codes import RejectReason, WarningCode
-from contracts.events import Event, EventReport, validate_events
+from contracts.events import Event, EventReport, content_fingerprint, validate_events
 from contracts.fields import CURRENCY_MINOR_UNITS
 from contracts.imports import (
     ENTITIES,
@@ -39,6 +39,7 @@ __all__ = [
     "Table",
     "TouchpointRecord",
     "WarningCode",
+    "content_fingerprint",
     "validate_events",
     "validate_import",
 ]

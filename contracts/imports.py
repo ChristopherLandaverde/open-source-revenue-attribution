@@ -6,6 +6,7 @@ rejected rows with reason codes, and warnings. It never loads anything; callers 
 """
 
 import csv
+import io
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
@@ -116,18 +117,25 @@ class ImportBatch:
     @classmethod
     def from_csv_dir(cls, path: Path) -> "ImportBatch":
         """Read `<entity>.csv` files (UTF-8, header row) from a directory."""
-        tables = {}
+        texts = {}
         for entity in ENTITIES:
             file = Path(path) / f"{entity}.csv"
-            if not file.exists():
+            if file.exists():
+                texts[entity] = file.read_bytes().decode("utf-8-sig")  # keep \r\n as-is
+        return cls.from_csv_texts(texts)
+
+    @classmethod
+    def from_csv_texts(cls, texts: dict[str, str]) -> "ImportBatch":
+        """Build a batch from each file's decoded text, keyed by entity. Absent = missing file."""
+        tables = {}
+        for entity in ENTITIES:
+            if entity not in texts:
                 continue
-            with file.open(newline="", encoding="utf-8-sig") as handle:
-                reader = csv.DictReader(handle)
-                columns = tuple((name or "").strip() for name in reader.fieldnames or ())
-                rows = tuple(
-                    {(k or "").strip(): v for k, v in row.items() if k is not None}
-                    for row in reader
-                )
+            reader = csv.DictReader(io.StringIO(texts[entity].removeprefix("\ufeff"), newline=""))
+            columns = tuple((name or "").strip() for name in reader.fieldnames or ())
+            rows = tuple(
+                {(k or "").strip(): v for k, v in row.items() if k is not None} for row in reader
+            )
             tables[entity] = Table(columns, rows)
         return cls(tables)
 

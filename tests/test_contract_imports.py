@@ -2,10 +2,11 @@
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
-from contracts import ImportBatch, RejectReason, WarningCode, validate_import
+from contracts import ENTITIES, ImportBatch, RejectReason, WarningCode, validate_import
 
 R, W = RejectReason, WarningCode
 
@@ -378,3 +379,21 @@ def test_every_code_and_column_is_documented():
         assert f"### {entity}.csv" in doc
         for column in columns:
             assert f"| `{column.name}` |" in doc, f"{entity}.{column.name} not documented"
+
+
+# --- M2: uploaded file contents ----------------------------------------------
+
+
+def test_csv_texts_read_like_files_on_disk():
+    demo = Path(__file__).resolve().parent.parent / "sample_data" / "demo"
+    texts = {e: (demo / f"{e}.csv").read_text(encoding="utf-8") for e in ENTITIES}
+    from_texts = validate_import(ImportBatch.from_csv_texts(texts))
+    from_dir = validate_import(ImportBatch.from_csv_dir(demo))
+    assert from_texts.to_dict() == from_dir.to_dict()
+
+
+def test_csv_text_tolerates_a_bom_and_an_absent_file_is_missing():
+    batch = ImportBatch.from_csv_texts({"accounts": "﻿account_id,name\nacc-1,One\n"})
+    report = validate_import(batch)
+    assert [a.account_id for a in report.accepted["accounts"]] == ["acc-1"]
+    assert {i.code for i in report.file_errors} == {R.MISSING_FILE}

@@ -1,10 +1,12 @@
 """Event contract for RudderStack page / track / identify payloads (docs/contract.md, "Events").
 
-`validate_events` checks a batch of payloads in arrival order. Collection and storage are
-M2; this module only decides what an event must carry to count.
+`validate_events` checks a batch of payloads in arrival order. It decides what an event
+must carry to count; the Django app (`collection/`) stores what it returns.
 """
 
+import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -25,6 +27,22 @@ CAMPAIGN_KEYS = {
     "content": "utm_content",
     "term": "utm_term",
 }
+
+
+# Top-level fields the SDK rewrites on every delivery attempt. They are transport metadata,
+# not event content, so a retry that differs only here is still an exact retry.
+TRANSPORT_FIELDS = ("sentAt",)
+
+
+def content_fingerprint(payload: Any) -> str:
+    """SHA-256 of the payload's canonical JSON, ignoring TRANSPORT_FIELDS.
+
+    Two payloads with the same fingerprint are the same event content.
+    """
+    if isinstance(payload, dict):
+        payload = {k: v for k, v in payload.items() if k not in TRANSPORT_FIELDS}
+    canonical = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -60,9 +78,17 @@ def _obj(value: Any) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-def validate_events(payloads: list[Any]) -> EventReport:
+def validate_events(
+    payloads: list[Any], already_accepted: Mapping[str, str] | None = None
+) -> EventReport:
+    """Validate payloads in arrival order.
+
+    `already_accepted` maps messageIds accepted earlier (for example, in previous requests)
+    to their `content_fingerprint`, so retries across requests follow the same rules as
+    retries within one batch.
+    """
     report = EventReport()
-    first_seen: dict[str, str] = {}  # messageId -> canonical JSON of the first payload
+    first_seen: dict[str, str] = dict(already_accepted or {})  # messageId -> fingerprint
     for position, payload in enumerate(payloads, start=1):
         payload_obj = _obj(payload)
         event_id = _text(payload_obj.get("messageId"))
@@ -71,7 +97,7 @@ def validate_events(payloads: list[Any]) -> EventReport:
         def reject(code, column, message, event_id=event_id, position=position, issues=issues):
             issues.append(Issue("events", position, event_id, code, column, message))
 
-        canonical = json.dumps(payload, sort_keys=True, default=str)
+        canonical = content_fingerprint(payload)
         if event_id in first_seen:
             if first_seen[event_id] == canonical:
                 report.warnings.append(
@@ -147,6 +173,13 @@ def _parse(payload: dict, reject) -> Event | None:
 
     campaign = _obj(context.get("campaign"))
     utm = {ours: _text(campaign.get(theirs)) for theirs, ours in CAMPAIGN_KEYS.items()}
+    referrer = _text(page.get("referrer")) or _text(properties.get("referrer"))
+    # Text limits from the general rules (docs/contract.md section 1).
+    limits = [("page.url", page_url, 500), ("page.referrer", referrer, 500)]
+    limits += [(name, value, 200) for name, value in utm.items()]
+    for column, value, limit in limits:
+        if len(value) > limit:
+            reject(R.VALUE_TOO_LONG, column, f"{column} is {len(value)} characters; limit {limit}.")
     if occurred_at is None:
         return None
     return Event(
@@ -158,7 +191,7 @@ def _parse(payload: dict, reject) -> Event | None:
         occurred_at=occurred_at,
         original_timestamp=original,
         page_url=page_url,
-        referrer=_text(page.get("referrer")) or _text(properties.get("referrer")),
+        referrer=referrer,
         **utm,
     )
 

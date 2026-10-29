@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from contracts import RejectReason, WarningCode, validate_events
+from contracts import RejectReason, WarningCode, content_fingerprint, validate_events
 
 R, W = RejectReason, WarningCode
 
@@ -168,3 +168,48 @@ def test_reused_message_id_with_different_content_is_rejected():
 
 def test_non_object_payload_is_rejected():
     assert codes(validate_events(["nope"])) == [("", R.MISSING_REQUIRED_FIELD, "type")]
+
+
+# --- M2: dedup across requests -------------------------------------------------
+
+
+def test_retry_with_a_new_sent_at_is_still_a_retry():
+    # The RudderStack SDK rewrites sentAt on every delivery attempt; it is transport metadata.
+    report = validate_events(
+        [page(sentAt="2026-03-01T10:00:01Z"), page(sentAt="2026-03-01T10:09Z")]
+    )
+    assert len(report.accepted) == 1
+    assert [w.code for w in report.warnings] == [W.DUPLICATE_ROW]
+
+
+def test_previously_accepted_message_ids_are_honoured():
+    first = page()
+    already = {"msg-1": content_fingerprint(first)}
+    retry = validate_events([page(sentAt="later")], already_accepted=already)
+    assert retry.accepted == []
+    assert [w.code for w in retry.warnings] == [W.DUPLICATE_ROW]
+    conflict = validate_events([page(anonymousId="anon-2")], already_accepted=already)
+    assert conflict.accepted == []
+    assert codes(conflict) == [("msg-1", R.DUPLICATE_ID, "messageId")]
+
+
+def test_fingerprint_ignores_key_order_and_sent_at():
+    a = {"messageId": "m", "type": "page", "sentAt": "1"}
+    b = {"type": "page", "messageId": "m", "sentAt": "2"}
+    assert content_fingerprint(a) == content_fingerprint(b)
+    assert content_fingerprint(a) != content_fingerprint({**a, "type": "track"})
+
+
+def test_text_limits_apply_to_events():
+    # docs/contract.md section 1: UTM values <= 200, landing page and referrer <= 500.
+    long_campaign = {"source": "s" * 201, "medium": "cpc", "name": "spring"}
+    report = validate_events(
+        [
+            page(context={"page": {"url": "https://x.example/" + "p" * 500}, "campaign": {}}),
+            page(messageId="msg-2", context={"page": {"url": "/"}, "campaign": long_campaign}),
+        ]
+    )
+    assert codes(report) == [
+        ("msg-1", R.VALUE_TOO_LONG, "page.url"),
+        ("msg-2", R.VALUE_TOO_LONG, "utm_source"),
+    ]
