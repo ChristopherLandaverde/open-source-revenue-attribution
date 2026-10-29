@@ -1,9 +1,12 @@
-"""The attribution package must stay pure Python: no Django (or other framework) imports."""
+"""Pure packages (attribution/, contracts/) must not import Django or app code."""
 
 import ast
 from pathlib import Path
 
-ATTRIBUTION_DIR = Path(__file__).resolve().parent.parent / "attribution"
+import pytest
+
+ROOT = Path(__file__).resolve().parent.parent
+PURE_PACKAGES = ["attribution", "contracts"]
 FORBIDDEN_ROOTS = {"django", "reports", "config"}
 
 
@@ -17,16 +20,16 @@ def imported_roots(path: Path) -> set[str]:
     return roots
 
 
-def test_attribution_package_exists():
-    assert list(ATTRIBUTION_DIR.glob("*.py")), "attribution/ has no modules"
+@pytest.mark.parametrize("package", PURE_PACKAGES)
+def test_pure_package_exists(package):
+    assert list((ROOT / package).glob("*.py")), f"{package}/ has no modules"
 
 
-def test_attribution_does_not_import_django_or_app_code():
+@pytest.mark.parametrize("package", PURE_PACKAGES)
+def test_pure_package_does_not_import_django_or_app_code(package):
     offenders = {
-        str(path.relative_to(ATTRIBUTION_DIR.parent)): sorted(
-            imported_roots(path) & FORBIDDEN_ROOTS
-        )
-        for path in ATTRIBUTION_DIR.rglob("*.py")
+        str(path.relative_to(ROOT)): sorted(imported_roots(path) & FORBIDDEN_ROOTS)
+        for path in (ROOT / package).rglob("*.py")
     }
     offenders = {path: names for path, names in offenders.items() if names}
-    assert offenders == {}, f"attribution/ must not import Django or app code: {offenders}"
+    assert offenders == {}, f"{package}/ must not import Django or app code: {offenders}"

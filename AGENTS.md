@@ -29,9 +29,15 @@ no React/Vite) · Django ORM + migrations on PostgreSQL · pytest + pytest-djang
 
 ## Conventions
 
-- **Architecture boundary:** `attribution/` is pure Python. No `django`, `reports`, or
-  `config` imports (`tests/test_architecture.py` fails otherwise). Django code converts
-  records to `attribution` types in `reports/services.py`.
+- **Architecture boundary:** `attribution/` and `contracts/` are pure Python. No `django`,
+  `reports`, or `config` imports (`tests/test_architecture.py` fails otherwise). Django code
+  converts records to `attribution` types in `reports/services.py`.
+- **Data contract:** `docs/contract.md` is the source of truth for import/event fields and
+  reason codes; `contracts/` enforces it. Reason codes are append-only. Changing what is
+  accepted is a data-meaning change (needs a decision). A test fails if a code or column is
+  missing from the doc.
+- **Fixture expectations** in `sample_data/demo/expected/` are hand-calculated and derived in
+  `sample_data/demo/README.md`. Never regenerate them from code output.
 - **Models are test-first** with hand-calculated expected outputs written in the test or
   fixture docs. Credits must reconcile to the opportunity amount.
 - **Copy:** reports state association under a named model and window, never causal

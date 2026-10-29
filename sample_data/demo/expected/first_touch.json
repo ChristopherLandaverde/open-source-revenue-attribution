@@ -1,0 +1,34 @@
+{
+  "_about": "Hand-calculated first-touch results for the accepted rows of sample_data/demo, 90-day inclusive lookback. Pipeline converts at created_at, won revenue at won_at (docs/decisions.md). Derivation in ../README.md.",
+  "pipeline": {
+    "opportunities": [
+      ["opp-101", "tp-01", "google / cpc / q1-search", "24000.00", "USD"],
+      ["opp-102", "tp-04", "newsletter / email / april-digest", "6000.00", "USD"],
+      ["opp-103", "tp-07", "google / cpc / q1-search", "15000.00", "USD"],
+      ["opp-104", null, "Unattributed", "9000.00", "USD"],
+      ["opp-105", "tp-12", "linkedin / (none) / (none)", "18500.50", "EUR"],
+      ["opp-106", "tp-14", "event / trade-show / robotics-expo", "1200000", "JPY"]
+    ],
+    "campaigns": [
+      ["linkedin / (none) / (none)", "EUR", "18500.50", 1],
+      ["event / trade-show / robotics-expo", "JPY", "1200000", 1],
+      ["google / cpc / q1-search", "USD", "39000.00", 2],
+      ["Unattributed", "USD", "9000.00", 1],
+      ["newsletter / email / april-digest", "USD", "6000.00", 1]
+    ],
+    "totals": {"EUR": "18500.50", "JPY": "1200000", "USD": "54000.00"}
+  },
+  "won": {
+    "opportunities": [
+      ["opp-101", "tp-03", "partner / referral / may-webinar", "24000.00", "USD"],
+      ["opp-103", "tp-07", "google / cpc / q1-search", "15000.00", "USD"],
+      ["opp-105", "tp-13", "(none) / (none) / (none)", "18500.50", "EUR"]
+    ],
+    "campaigns": [
+      ["(none) / (none) / (none)", "EUR", "18500.50", 1],
+      ["partner / referral / may-webinar", "USD", "24000.00", 1],
+      ["google / cpc / q1-search", "USD", "15000.00", 1]
+    ],
+    "totals": {"EUR": "18500.50", "USD": "39000.00"}
+  }
+}

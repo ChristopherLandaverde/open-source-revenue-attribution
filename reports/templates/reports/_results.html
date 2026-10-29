@@ -1,4 +1,4 @@
-<section id="results" aria-live="polite">
+{% load money %}<section id="results" aria-live="polite">
   <p class="context">
     Model: <strong>{{ report.model_name }}</strong> ·
     Lookback window: <strong>{{ report.lookback_days }} days</strong> ·
@@ -16,7 +16,7 @@
       <th scope="col" class="num">Credited amount</th><th scope="col" class="num">Opportunities</th></tr></thead>
     <tbody>
     {% for campaign, currency, amount, count in report.campaign_rows %}
-      <tr><td>{{ campaign }}</td><td>{{ currency }}</td><td class="num">{{ amount }}</td><td class="num">{{ count }}</td></tr>
+      <tr><td>{{ campaign }}</td><td>{{ currency }}</td><td class="num">{{ amount|minor_unit:currency }}</td><td class="num">{{ count }}</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -31,12 +31,12 @@
     <tbody>
     {% for row in report.opportunity_rows %}
       <tr>
-        <td>{{ row.opportunity.name }}</td>
-        <td>{{ row.opportunity.contact.account.name }}</td>
+        <td>{{ row.opportunity.name|default:row.opportunity.external_id }}</td>
+        <td>{{ row.opportunity.account.name|default:row.opportunity.account.external_id }}</td>
         <td>{{ row.converted_at|date:"Y-m-d H:i" }} UTC</td>
         <td>{{ row.credit.touchpoint_id|default:"None eligible" }}</td>
         <td>{{ row.credit.campaign_key }}</td>
-        <td class="num">{{ row.credit.amount }} {{ row.credit.currency }}</td>
+        <td class="num">{{ row.credit.amount|minor_unit:row.credit.currency }} {{ row.credit.currency }}</td>
       </tr>
     {% endfor %}
     </tbody>

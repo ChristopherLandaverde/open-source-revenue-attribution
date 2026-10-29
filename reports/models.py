@@ -1,15 +1,15 @@
-"""Minimal M0 records for the sample dataset. The full schema is designed in M1-M3."""
+"""Records loaded through the import contract (docs/contract.md). Physical schema grows in M2-M3."""
 
 from django.db import models
 
 
 class Account(models.Model):
     external_id = models.CharField(max_length=64, unique=True)
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=200, blank=True)
     domain = models.CharField(max_length=200, blank=True)
 
     def __str__(self):
-        return self.name
+        return self.name or self.external_id
 
 
 class Contact(models.Model):
@@ -29,8 +29,16 @@ class Opportunity(models.Model):
         WON = "won", "Won"
 
     external_id = models.CharField(max_length=64, unique=True)
-    contact = models.ForeignKey(Contact, on_delete=models.PROTECT, related_name="opportunities")
-    name = models.CharField(max_length=200)
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="opportunities")
+    # Optional: an opportunity without a contact has no touchpoints and is Unattributed.
+    contact = models.ForeignKey(
+        Contact,
+        on_delete=models.PROTECT,
+        related_name="opportunities",
+        null=True,
+        blank=True,
+    )
+    name = models.CharField(max_length=200, blank=True)
     amount = models.DecimalField(max_digits=14, decimal_places=2)
     currency = models.CharField(max_length=3)
     stage = models.CharField(max_length=16, choices=Stage.choices)
@@ -41,7 +49,7 @@ class Opportunity(models.Model):
         verbose_name_plural = "opportunities"
 
     def __str__(self):
-        return self.name
+        return self.name or self.external_id
 
 
 class Touchpoint(models.Model):
@@ -51,7 +59,27 @@ class Touchpoint(models.Model):
     source = models.CharField(max_length=200, blank=True)
     medium = models.CharField(max_length=200, blank=True)
     campaign = models.CharField(max_length=200, blank=True)
+    content = models.CharField(max_length=200, blank=True)
+    term = models.CharField(max_length=200, blank=True)
     landing_page = models.CharField(max_length=500, blank=True)
+    referrer = models.CharField(max_length=500, blank=True)
 
     def __str__(self):
         return self.external_id
+
+
+class ImportRun(models.Model):
+    """Provenance of one import: where it came from and its full validation report."""
+
+    source = models.CharField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+    lookback_days = models.PositiveIntegerField()
+    strict = models.BooleanField(default=False)
+    loaded = models.BooleanField(help_text="False when a strict import refused everything.")
+    report = models.JSONField()  # contracts.ImportReport.to_dict()
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.source} @ {self.created_at:%Y-%m-%d %H:%M}"

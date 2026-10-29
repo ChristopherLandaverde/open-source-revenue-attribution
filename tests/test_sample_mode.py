@@ -1,4 +1,4 @@
-"""Sample mode end to end: load the fixture, render the report, check hand-calculated numbers."""
+"""Sample mode end to end: load the demo fixture and render the first-touch report."""
 
 from decimal import Decimal
 
@@ -18,26 +18,15 @@ def sample():
 
 def test_load_is_idempotent(sample):
     call_command("load_sample_data", verbosity=0)
-    assert Opportunity.objects.count() == 3
-    assert Touchpoint.objects.count() == 5
+    assert Opportunity.objects.count() == 6
+    assert Touchpoint.objects.count() == 15
 
 
-def test_pipeline_first_touch_matches_hand_calculation(sample):
-    report = first_touch_report("pipeline")
-    assert report.campaign_rows == [
-        ("google / cpc / q1-search", "USD", Decimal("12000.00"), 1),
-        ("newsletter / email / april-digest", "USD", Decimal("8000.00"), 1),
-        ("Unattributed", "USD", Decimal("5000.00"), 1),
-    ]
-    assert sum(row[2] for row in report.campaign_rows) == Decimal("25000.00")
-
-
-def test_won_first_touch_matches_hand_calculation(sample):
-    report = first_touch_report("won")
-    assert report.campaign_rows == [
-        ("google / cpc / q1-search", "USD", Decimal("12000.00"), 1),
-        ("partner / referral / may-webinar", "USD", Decimal("5000.00"), 1),
-    ]
+def test_pipeline_report_reconciles_per_currency(sample):
+    # Hand-calculated in sample_data/demo/README.md; exact rows in tests/test_demo_fixture.py.
+    rows = first_touch_report("pipeline").campaign_rows
+    usd = sum(amount for _, currency, amount, _ in rows if currency == "USD")
+    assert usd == Decimal("54000.00")  # 24,000 + 6,000 + 15,000 + 9,000 (Unattributed)
 
 
 def test_report_page_renders_with_model_and_window(client, sample):
@@ -49,6 +38,7 @@ def test_report_page_renders_with_model_and_window(client, sample):
     assert "google / cpc / q1-search" in html
     assert "not causal impact" in html
     assert 'hx-get="/"' in html
+    assert 'href="/validation/"' in html
 
 
 def test_htmx_request_returns_fragment_only(client, sample):
@@ -74,3 +64,9 @@ def test_report_copy_never_claims_causation(client, sample):
     html = client.get("/").content.decode().lower()
     for phrase in ("caused by", "drove revenue", "impact of", "roi"):
         assert phrase not in html
+
+
+def test_amounts_display_at_the_currency_minor_unit(client, sample):
+    html = client.get("/").content.decode()
+    assert "1200000 JPY" in html and "1200000.00" not in html
+    assert "18500.50 EUR" in html

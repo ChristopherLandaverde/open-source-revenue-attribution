@@ -7,9 +7,11 @@ and inspect the math behind every number.
 Attribution here is a reporting model. It shows how a stated rule assigns credit; it does
 not estimate causal impact or incrementality.
 
-**Status:** M0 (repository and setup proof). One model (first-touch), a tiny synthetic
-sample dataset, and one server-rendered report. See [docs/prd.md](docs/prd.md) for product
-scope and [docs/project-management-plan.md](docs/project-management-plan.md) for milestones.
+**Status:** M1 (contracts and fixtures). A documented import and event contract
+([docs/contract.md](docs/contract.md)) enforced by a validator, a synthetic B2B demo fixture
+with hand-calculated expected results, one model (first-touch), and two server-rendered pages:
+the report and the data validation report. See [docs/prd.md](docs/prd.md) for product scope
+and [docs/project-management-plan.md](docs/project-management-plan.md) for milestones.
 
 ## Quick start (fresh clone to running app with sample data)
 
@@ -26,8 +28,14 @@ uv run python manage.py load_sample_data
 uv run python manage.py runserver
 ```
 
-Open http://127.0.0.1:8000/ for the first-touch sample report. Switch between
-"Pipeline" and "Won revenue" to swap the results table in place (HTMX).
+`load_sample_data` validates the demo fixture first: it loads the accepted rows and lists
+the rows it refused, with reason codes (the fixture contains a few invalid rows on purpose).
+Add `--strict` to refuse the whole import on any error, or `--path <dir>` to load your own
+CSV files in the [import format](docs/contract.md#2-csv-import-files).
+
+Open http://127.0.0.1:8000/ for the first-touch report. Switch between "Pipeline" and "Won
+revenue" to swap the results table in place (HTMX). http://127.0.0.1:8000/validation/ shows
+the last import's validation report: counts per file, refused rows and warnings.
 
 ### Without Docker (SQLite)
 
@@ -54,11 +62,12 @@ CI (`.github/workflows/ci.yml`) runs the same commands.
 | Path | What |
 |---|---|
 | `attribution/` | Pure-Python attribution models and types. No Django imports (enforced by a test). |
-| `reports/` | Django app: sample records, `load_sample_data` command, report view. |
+| `contracts/` | Pure-Python import/event contract validator and reason codes. No Django imports. |
+| `reports/` | Django app: records, `load_sample_data` command, report and validation views. |
 | `config/` | Django project settings (read from environment / `.env`). |
-| `sample_data/` | Synthetic sample dataset with hand-calculated expected results. |
+| `sample_data/demo/` | Synthetic demo fixture (CSV) with hand-calculated expected results in `expected/`. |
 | `templates/`, `static/` | Django templates, plain CSS with design tokens, vendored HTMX and RudderStack SDK. |
-| `docs/` | PRD, project management plan, market research. |
+| `docs/` | Data contract, PRD, decisions, project management plan, market research. |
 
 ## License
 

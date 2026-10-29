@@ -9,7 +9,13 @@
   <script src="{% static 'vendor/htmx-2.0.4.min.js' %}" defer></script>
 </head>
 <body>
-  <header class="site-header"><span class="brand">Open Source Revenue Attribution</span></header>
+  <header class="site-header">
+    <span class="brand">Open Source Revenue Attribution</span>
+    <nav class="site-nav" aria-label="Main">
+      <a href="{% url 'reports:report' %}">Report</a>
+      <a href="{% url 'reports:validation' %}">Data validation</a>
+    </nav>
+  </header>
   <main class="page">{% block content %}{% endblock %}</main>
 </body>
 </html>

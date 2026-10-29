@@ -6,7 +6,8 @@ from decimal import Decimal
 from django.conf import settings
 
 import attribution
-from reports.models import Opportunity
+from contracts import RejectReason, WarningCode
+from reports.models import ImportRun, Opportunity
 
 METRICS = {
     "pipeline": "Pipeline (credited at opportunity creation)",
@@ -47,7 +48,8 @@ def to_conversion(opportunity: Opportunity, metric: str) -> attribution.Conversi
                 medium=tp.medium,
                 campaign=tp.campaign,
             )
-            for tp in opportunity.contact.touchpoints.all()
+            # Contact-level attribution (PRD section 6): no contact means no touchpoints.
+            for tp in (opportunity.contact.touchpoints.all() if opportunity.contact else ())
         ),
     )
 
@@ -56,7 +58,7 @@ def first_touch_report(metric: str = "pipeline") -> Report:
     if metric not in METRICS:
         raise ValueError(f"Unknown metric: {metric}")
     model = attribution.FirstTouch(lookback_days=settings.ATTRIBUTION_LOOKBACK_DAYS)
-    opportunities = Opportunity.objects.select_related("contact__account").prefetch_related(
+    opportunities = Opportunity.objects.select_related("account", "contact").prefetch_related(
         "contact__touchpoints"
     )
     if metric == "won":
@@ -74,4 +76,46 @@ def first_touch_report(metric: str = "pipeline") -> Report:
         lookback_days=model.lookback_days,
         campaign_rows=attribution.summarize_by_campaign(credits),
         opportunity_rows=rows,
+    )
+
+
+ISSUE_VIEWS = {"rejected": "Refused rows", "warnings": "Warnings"}
+
+
+@dataclass(frozen=True)
+class ValidationView:
+    run: ImportRun | None
+    show: str
+    file_rows: list[dict]
+    issues: list[dict]
+    codes: list[tuple[str, str]]  # (code, description) for every code in this report
+
+
+def validation_view(show: str = "rejected") -> ValidationView:
+    """The latest import's validation report, shaped for the template."""
+    if show not in ISSUE_VIEWS:
+        raise ValueError(f"Unknown issue view: {show}")
+    run = ImportRun.objects.first()
+    if run is None:
+        return ValidationView(None, show, [], [], [])
+    report = run.report
+    rejected = [issue for row in report["rejected"] for issue in row["issues"]]
+    warnings = report["warnings"]
+    file_rows = []
+    for entity, counts in report["counts"].items():
+        file_rows.append(
+            {
+                "file": f"{entity}.csv",
+                **counts,
+                "warnings": sum(1 for w in warnings if w["entity"] == entity),
+            }
+        )
+    descriptions = {str(code): code.description for code in [*RejectReason, *WarningCode]}
+    present = {i["code"] for i in [*rejected, *warnings, *report["file_errors"]]}
+    return ValidationView(
+        run=run,
+        show=show,
+        file_rows=file_rows,
+        issues=rejected if show == "rejected" else warnings,
+        codes=[(code, descriptions[code]) for code in sorted(present)],
     )

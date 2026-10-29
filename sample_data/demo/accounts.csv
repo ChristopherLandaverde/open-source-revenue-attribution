@@ -1,0 +1,6 @@
+account_id,name,domain
+acc-northwind,Northwind Logistics,northwind.example
+acc-umbra,Umbra Health,umbra.example
+acc-kestrel,Kestrel Bank,kestrel.example
+acc-sakura,Sakura Robotics,sakura.example
+acc beta,Beta Labs,beta.example
