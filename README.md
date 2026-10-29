@@ -11,15 +11,16 @@ A self-hostable Django app for marketers, founders and agency analysts at small 
 who need a revenue report they can explain. It collects RudderStack events, imports accounts,
 contacts, opportunities and touchpoints from CSV, refuses data that breaks a
 [documented contract](docs/contract.md) with a reason code, and credits each opportunity under
-a named model and lookback window.
+five named models and a lookback window, side by side.
 
 Attribution here is a reporting model. It shows how a stated rule assigns credit; it does not
 estimate causal impact or incrementality.
 
-**Status:** M3 (identity stitching, opportunity journeys) is on `main`; session-level touchpoints (#7) on a work branch.
-One model (first-touch). Milestones: [docs/project-management-plan.md](docs/project-management-plan.md).
+**Status:** M4 (model comparison, influenced amounts, data readiness) is on a work branch,
+awaiting review; M3 and session-level touchpoints (#7) are on `main`. Milestones:
+[docs/project-management-plan.md](docs/project-management-plan.md).
 
-![First-touch attribution report on the synthetic demo data: credit by source / medium / campaign per currency, with the model and 90-day lookback window shown above the tables](docs/media/report.png)
+![Model comparison on the synthetic demo data: a "Fix data first" verdict with the top fix, then credit per source / medium / campaign under first-touch, last-touch, linear, position-based and time-decay models, with an overlapping Influenced column](docs/media/report.png)
 
 ## Quick start
 
@@ -37,10 +38,13 @@ uv run python manage.py load_sample_data
 uv run python manage.py runserver
 ```
 
-Open http://127.0.0.1:8000/ for the first-touch report on the synthetic demo data. Switch
-between **Pipeline** and **Won revenue** to swap the tables in place. Click an opportunity to
-open its journey: every touch of its contact, why each one is or isn't eligible, and the
-credit it gets.
+Open http://127.0.0.1:8000/ for the model comparison on the synthetic demo data: credit per
+campaign under five models, each named with its rule, and the influenced amount beside them.
+Switch between **Pipeline** and **Won revenue** to swap the tables in place. Click an
+opportunity to open its journey: every touch of its contact, why each one is or isn't eligible,
+and its first-touch credit.
+http://127.0.0.1:8000/readiness/ lists what to fix in the data before you trust the numbers.
+On the demo data, 3 checks need a fix. Each one comes with its fix and a way to verify it.
 http://127.0.0.1:8000/validation/ shows what the import refused and why: the demo data has 10
 invalid rows on purpose.
 
@@ -87,16 +91,23 @@ The Postgres path has not been run end to end yet; tests and the steps above use
 | Event collection | `POST /v1/batch`, `/v1/page`, `/v1/track`, `/v1/identify` with a per-workspace write key. Validated, deduplicated on `messageId`, raw payload and outcome stored. | Works |
 | Events to touchpoints | An identify links the browser's earlier anonymous page views to the contact. Each session (a browser's events less than 30 minutes apart, as in Dreamdata and GA4) is one touchpoint, credited to its first page view's UTMs or referrer; later page views in the session are not counted again. Browser clock skew corrected with receive time minus `sentAt`. | Works |
 | Opportunity journey | `/opportunities/<id>/journey/`: each touch of the opportunity's contact in a fixed order, its lookback status, the session rule that admitted it with the session's page views nested under it, and its first-touch credit | Works |
-| Attribution | First-touch, pipeline (at creation) and won revenue (at close), 90-day lookback, totals per currency | Works |
+| Model comparison | `/`: first-touch, last-touch, linear, position-based (U-shaped, 40/20/40) and time decay (7-day half-life) side by side per campaign and per opportunity. Pipeline (at creation) and won revenue (at close), 90-day lookback, totals per currency. Every model column sums to the amount, with leftover cents assigned deterministically. | Works |
+| Attributed vs influenced | An Influenced column beside the models: the full amount of every opportunity a campaign touched, labelled as overlapping and never totalled (Dreamdata's definition) | Works |
+| Data readiness | `/readiness/`: 7 checks with denominators (contacts, tracked touches, touches in the window, campaign fields, refused import rows, refused events, unlinked page views). Each failing check comes with its fix, a way to verify it, and the affected records. Checks without data show "Not checked". | Works |
 | Demo fixtures | Synthetic CSVs and events with hand-calculated expected results ([sample_data/](sample_data/)) | Works |
-| Last-touch and linear, side by side | | Planned (M4) |
 | Combined account journey, stage history | | Planned |
-| Data readiness panel, attributed vs influenced | | Planned (M4) |
+| W-shaped model (needs a lead milestone), journeys under every model | | Planned |
 | Self-hosting guide, release | | Planned (M5) |
 
 ## Known limits
 
-- **One model.** Only first-touch exists; there is nothing to compare it with yet.
+- **Rule-based models only.** No data-driven model: it needs volume and can't be checked by
+  hand. No W-shaped model yet. Model definitions and their sources:
+  [docs/research/m4-models.md](docs/research/m4-models.md).
+- **The window is fixed at 90 days** (GA4's default). Dreamdata counts from the first
+  interaction instead, so long journeys show more Unattributed here.
+- **Journeys show first-touch credit.** The other models' per-touch credit is in the
+  comparison's "Credit by opportunity" table.
 - **No login.** Every page, including CSV upload, is open to anyone who can reach the server.
   Run it locally or behind your own access control.
 - **Same-origin collection only.** The endpoint sends no CORS headers, so a site on another
@@ -121,10 +132,10 @@ The Postgres path has not been run end to end yet; tests and the steps above use
 | `contracts/` | Pure-Python contract: import and event validators, reason codes, clock-skew correction, event → touchpoint conversion (stitching, sessions). No Django imports (a test enforces it). |
 | `attribution/` | Pure-Python models, types and journeys. No Django imports. |
 | `collection/` | Django app: write-key workspaces, `/v1/` endpoint, stored events, events page, SDK demo page. |
-| `reports/` | Django app: records, imports (command and upload page), report, journey and validation pages. |
+| `reports/` | Django app: records, imports (command and upload page), model comparison, data readiness, journey and validation pages. |
 | `sample_data/` | Synthetic demo CSVs and events with hand-calculated expected results. |
 | `static/` | Plain CSS with Focosys design tokens; vendored HTMX, RudderStack SDK and fonts (versions and hashes in `static/vendor/README.md`). |
-| `docs/` | Data contract, PRD, decisions, project management plan, market research. |
+| `docs/` | Data contract, PRD, decisions, model research, project management plan, market research. |
 
 ## Development
 
