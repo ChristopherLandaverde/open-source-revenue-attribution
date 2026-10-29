@@ -59,10 +59,11 @@ class Check:
 class Readiness:
     metric: str
     metric_label: str
-    lookback_days: int
+    lookback_days: int | None
     checks: list[Check]
     opportunities: int
     attributable: int  # opportunities with at least one eligible touch
+    no_touch: list[str]  # the others: Unattributed, and left out of Influenced
     touch_period: tuple | None  # (earliest, latest) touch time
     conversion_period: tuple | None
 
@@ -108,6 +109,12 @@ def readiness(metric: str = "pipeline") -> Readiness:
     tracked = [(o, c) for o, c in with_contact if c.touchpoints]
     eligible = {o.external_id: attribution.eligible_touchpoints(c, lookback) for o, c in tracked}
     attributable = [oid for oid, touches in eligible.items() if touches]
+    no_touch = sorted(o.external_id for o, _ in pairs if not eligible.get(o.external_id))
+    window_title = (
+        "Touches happen before the conversion"
+        if lookback is None
+        else "Touches fall inside the lookback window"
+    )
     eligible_touches = [tp for touches in eligible.values() for tp in touches]
 
     if not total:
@@ -115,7 +122,7 @@ def readiness(metric: str = "pipeline") -> Readiness:
         for key, title in [
             ("contact", "Opportunities have a contact"),
             ("tracked", "Contacts have tracked touches"),
-            ("window", "Touches fall inside the lookback window"),
+            ("window", window_title),
             ("utm", "Touches carry source, medium and campaign"),
         ]:
             checks.append(Check(key, title, NOT_CHECKED, None, None, reason, ""))
@@ -167,18 +174,30 @@ def readiness(metric: str = "pipeline") -> Readiness:
                 )
             )
         if tracked:
+            if lookback is None:
+                where = "at or before the conversion"
+                impact = "Touches after the conversion get no credit; the opportunity is "
+                fix = "Import the touches from before the conversion (CSV or earlier events)."
+            else:
+                where = f"inside the {lookback}-day window"
+                impact = (
+                    "Touches before the window or after the conversion get no credit; "
+                    "the opportunity is "
+                )
+                fix = (
+                    "Import the touch history from before the window, or raise or unset "
+                    "ATTRIBUTION_LOOKBACK_DAYS and restart the server."
+                )
             checks.append(
                 _share(
                     "window",
-                    "Touches fall inside the lookback window",
+                    window_title,
                     len(attributable),
                     len(tracked),
                     finding=f"{len(attributable)} of {len(tracked)} tracked opportunities have "
-                    f"a touch inside the {lookback}-day window.",
-                    impact="Touches before the window or after the conversion get no credit; "
-                    "the opportunity is Unattributed.",
-                    fix="Import the touch history from before the window, or raise "
-                    "ATTRIBUTION_LOOKBACK_DAYS and restart the server.",
+                    f"a touch {where}.",
+                    impact=impact + "Unattributed and left out of Influenced.",
+                    fix=fix,
                     verify="Open the opportunity's journey: a touch shows as eligible.",
                     failing=[oid for oid, touches in eligible.items() if not touches],
                 )
@@ -187,7 +206,7 @@ def readiness(metric: str = "pipeline") -> Readiness:
             checks.append(
                 Check(
                     "window",
-                    "Touches fall inside the lookback window",
+                    window_title,
                     NOT_CHECKED,
                     None,
                     None,
@@ -239,6 +258,7 @@ def readiness(metric: str = "pipeline") -> Readiness:
         checks=checks,
         opportunities=total,
         attributable=len(attributable),
+        no_touch=no_touch,
         touch_period=(first_touch, last_touch) if first_touch else None,
         conversion_period=(conversion_times[0], conversion_times[-1]) if conversion_times else None,
     )

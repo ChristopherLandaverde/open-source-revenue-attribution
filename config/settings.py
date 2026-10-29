@@ -74,8 +74,10 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Attribution lookback window in days (PRD section 6 demo default).
-ATTRIBUTION_LOOKBACK_DAYS = env.int("ATTRIBUTION_LOOKBACK_DAYS", default=90)
+# Optional attribution lookback cap in days. Unset or blank: no cap, every touch from the first
+# interaction up to the conversion counts, as in Dreamdata (docs/decisions.md).
+_lookback = env.str("ATTRIBUTION_LOOKBACK_DAYS", default="").strip()
+ATTRIBUTION_LOOKBACK_DAYS = int(_lookback) if _lookback else None
 
 # Event collection (collection/). Most events accepted in one /v1/batch request.
 COLLECT_MAX_BATCH = env.int("COLLECT_MAX_BATCH", default=500)

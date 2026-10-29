@@ -8,7 +8,9 @@ from decimal import ROUND_FLOOR, Decimal
 from fractions import Fraction
 from typing import Protocol
 
-DEFAULT_LOOKBACK_DAYS = 90
+# No cap by default: every touch from the first interaction up to the conversion is eligible,
+# as in Dreamdata (docs/decisions.md). A model can take a lookback in days instead.
+DEFAULT_LOOKBACK_DAYS: int | None = None
 UNATTRIBUTED = "Unattributed"
 MISSING = "(none)"
 
@@ -56,26 +58,38 @@ class AttributionModel(Protocol):
     """Every model takes one conversion and returns credits that sum to its amount."""
 
     name: str
-    lookback_days: int
+    lookback_days: int | None  # None: no cap (first interaction to conversion)
     parameters: str  # the rule in one line, shown next to the model name
+    standard: str  # which vendors define the model this way (docs/research/m4-models.md)
 
     def attribute(self, conversion: Conversion) -> list[Credit]: ...
 
 
-def window_start(conversion: Conversion, lookback_days: int) -> datetime:
-    """The earliest eligible instant: conversion time minus the lookback (inclusive)."""
+def describe_window(lookback_days: int | None) -> str:
+    """The window in words, shown next to every number."""
+    if lookback_days is None:
+        return "No lookback cap: every touch up to the conversion"
+    return f"{lookback_days}-day lookback"
+
+
+def window_start(conversion: Conversion, lookback_days: int | None) -> datetime | None:
+    """The earliest eligible instant (inclusive), or None when there is no cap."""
+    if lookback_days is None:
+        return None
     return conversion.converted_at - timedelta(days=lookback_days)
 
 
-def eligible_touchpoints(conversion: Conversion, lookback_days: int) -> list[Touchpoint]:
-    """Touchpoints inside [converted_at - lookback, converted_at], oldest first.
+def eligible_touchpoints(conversion: Conversion, lookback_days: int | None) -> list[Touchpoint]:
+    """Touchpoints at or before the conversion (and inside the lookback, if any), oldest first.
 
     Both window ends are inclusive. Ties on time are broken by touchpoint id so the
     same input always produces the same order.
     """
     start = window_start(conversion, lookback_days)
     eligible = [
-        tp for tp in conversion.touchpoints if start <= tp.occurred_at <= conversion.converted_at
+        tp
+        for tp in conversion.touchpoints
+        if (start is None or start <= tp.occurred_at) and tp.occurred_at <= conversion.converted_at
     ]
     return sorted(eligible, key=lambda tp: (tp.occurred_at, tp.id))
 

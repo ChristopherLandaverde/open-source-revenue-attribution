@@ -1,14 +1,13 @@
-{% load money %}{% with opp=view.opportunity journey=view.journey %}<section id="results" aria-live="polite">
+{% load money windows %}{% with opp=view.opportunity journey=view.journey %}<section id="results" aria-live="polite">
   {% if not journey %}
     <p class="verdict"><span class="tag tag-neutral">– Not won</span> {{ opp.name|default:opp.external_id }} is still open, so it has no won-revenue journey.</p>
     <p>Switch to <a href="{% url 'reports:journey' opp.external_id %}?metric=pipeline">pipeline</a> to see the journey to its creation.</p>
   {% else %}
-    {% with step=journey.credited_step amount=opp.amount|minor_unit:opp.currency %}
-    {% if step %}
+    {% with amount=opp.amount|minor_unit:opp.currency %}
+    {% if view.eligible_count %}
       <p class="verdict"><span class="tag tag-accepted">✓ Credited</span>
-        {{ view.model_name }} gives the full {{ amount }} {{ opp.currency }} to <span class="mono">{{ step.touchpoint.id }}</span>
-        (<span class="mono">{{ step.touchpoint.campaign_key }}</span>).</p>
-      <p class="context">{% if view.eligible_count == 1 %}It is the only eligible touch in the window.{% else %}It is the earliest of {{ view.eligible_count }} eligible touches in the window.{% endif %}</p>
+        {% if view.eligible_count == 1 %}One eligible touch gets the full {{ amount }} {{ opp.currency }} under every model.{% else %}{{ view.eligible_count }} eligible touches share the full {{ amount }} {{ opp.currency }}; each model splits it differently.{% endif %}</p>
+      <p class="context">Each model column below adds up to {{ amount }} {{ opp.currency }}. Window: {{ view.lookback_days|window }}.</p>
     {% elif not opp.contact %}
       <p class="verdict"><span class="tag tag-review">! Unattributed</span>
         No contact on this opportunity, so the full {{ amount }} {{ opp.currency }} is Unattributed.</p>
@@ -19,7 +18,7 @@
       <p class="context">Import touchpoints.csv rows or send page events for this contact.</p>
     {% else %}
       <p class="verdict"><span class="tag tag-review">! Unattributed</span>
-        No touch of <span class="mono">{{ opp.contact.external_id }}</span> is in the {{ view.lookback_days }}-day window, so the full {{ amount }} {{ opp.currency }} is Unattributed.</p>
+        No touch of <span class="mono">{{ opp.contact.external_id }}</span> is eligible ({{ view.lookback_days|window }}), so the full {{ amount }} {{ opp.currency }} is Unattributed under every model.</p>
       <p class="context">Touches outside the window are listed below with the reason.</p>
     {% endif %}
     {% endwith %}
@@ -35,19 +34,20 @@
       <dt class="label">Conversion</dt>
       <dd><span class="mono">{{ journey.conversion.converted_at|date:"Y-m-d H:i" }} UTC</span> · {{ view.metric_label }}</dd>
       <dt class="label">Window</dt>
-      <dd><span class="mono">{{ journey.window_start|date:"Y-m-d H:i" }} → {{ journey.conversion.converted_at|date:"Y-m-d H:i" }} UTC</span>: {{ view.lookback_days }} days, both ends included</dd>
-      <dt class="label">Model</dt>
-      <dd>{{ view.model_name }}: the earliest eligible touch gets the full amount; ties on time go to the lower touch ID</dd>
+      <dd>{% if journey.window_start %}<span class="mono">{{ journey.window_start|date:"Y-m-d H:i" }} → {{ journey.conversion.converted_at|date:"Y-m-d H:i" }} UTC</span>: {{ view.lookback_days }} days, both ends included{% else %}No lookback cap: every touch up to <span class="mono">{{ journey.conversion.converted_at|date:"Y-m-d H:i" }} UTC</span> is eligible, as in Dreamdata{% endif %}</dd>
+      <dt class="label">Models</dt>
+      <dd>{% for model in view.models %}<strong>{{ model.name }}</strong>: {{ model.parameters }}.{% if not forloop.last %}<br>{% endif %}{% endfor %}<br><span class="small muted">Touches are ordered by time; ties go to the lower touch ID.</span></dd>
     </dl>
 
     {% if view.rows %}
     <h2>Touches of <span class="mono">{{ opp.contact.external_id }}</span> <span class="muted">(oldest first)</span></h2>
     <div class="table-wrap">
     <table class="journey-table">
+      <caption class="context small">Credit per model in {{ opp.currency }}; — means the touch is not eligible.</caption>
       <thead><tr>
         <th scope="col" class="num">#</th><th scope="col">Time (UTC)</th><th scope="col">Touch</th>
         <th scope="col">Source / medium / campaign</th><th scope="col">How it became a touch</th>
-        <th scope="col">Lookback</th><th scope="col" class="num">Credit ({{ opp.currency }})</th>
+        <th scope="col">Eligibility</th>{% for model in view.models %}<th scope="col" class="num">{{ model.name }}</th>{% endfor %}
       </tr></thead>
       <tbody>
       {% for row in view.rows %}
@@ -59,7 +59,7 @@
           <td><span class="mono">{{ row.campaign_key }}</span>{% if row.landing_page %}<br><span class="small muted mono">{{ row.landing_page|truncatechars:60 }}</span>{% endif %}</td>
           <td>{% if row.session_number %}Part of session {{ row.session_number }}, started by touch #{{ row.position }}{% else %}Part of the session started by <span class="mono">{{ row.session_id }}</span>{% endif %}; not counted again.</td>
           <td><span class="tag {{ row.status_class }}">{{ row.status_label }}</span><br><span class="small">{{ row.window_text }}</span></td>
-          <td class="num">—</td>
+          {% for model in view.models %}<td class="num">—</td>{% endfor %}
         </tr>
         {% else %}
         <tr{% if row.session_number %} class="session-start"{% endif %}>
@@ -69,16 +69,16 @@
           <td><span class="mono">{{ row.campaign_key }}</span>{% if row.landing_page %}<br><span class="small muted mono">{{ row.landing_page|truncatechars:60 }}</span>{% endif %}</td>
           <td>{% if row.session_number %}<strong>Session {{ row.session_number }} · {{ row.session_size }} page view{{ row.session_size|pluralize }}</strong><br>{% endif %}{{ row.how }}{% if row.stitched_from %}<br><span class="small">Anonymous view, linked by an identify of <span class="mono">{{ row.stitched_from }}</span>.</span>{% endif %}</td>
           <td><span class="tag {{ row.status_class }}">{{ row.status_label }}</span><br><span class="small">{{ row.window_text }}</span></td>
-          <td class="num">{% if row.credit is None %}—{% else %}{{ row.credit|minor_unit:opp.currency }}{% endif %}</td>
+          {% for credit in row.credits %}<td class="num">{% if credit is None %}—{% else %}{{ credit|minor_unit:opp.currency }}{% endif %}</td>{% endfor %}
         </tr>
         {% endif %}
       {% endfor %}
       </tbody>
       <tfoot>
         {% if journey.unattributed %}
-        <tr><th scope="row" colspan="6">Unattributed</th><td class="num">{{ journey.unattributed|minor_unit:opp.currency }}</td></tr>
+        <tr><th scope="row" colspan="6">Unattributed</th>{% for model in view.models %}<td class="num">{{ journey.unattributed|minor_unit:opp.currency }}</td>{% endfor %}</tr>
         {% endif %}
-        <tr><th scope="row" colspan="6">Total, equal to the opportunity amount</th><td class="num">{{ opp.amount|minor_unit:opp.currency }}</td></tr>
+        <tr><th scope="row" colspan="6">Total, equal to the opportunity amount</th>{% for model in view.models %}<td class="num">{{ opp.amount|minor_unit:opp.currency }}</td>{% endfor %}</tr>
       </tfoot>
     </table>
     </div>

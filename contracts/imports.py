@@ -229,7 +229,7 @@ class RejectedRow:
 
 @dataclass
 class ImportReport:
-    lookback_days: int
+    lookback_days: int | None  # None: no cap
     accepted: dict[str, list] = field(default_factory=lambda: {e: [] for e in ENTITIES})
     rejected: list[RejectedRow] = field(default_factory=list)
     warnings: list[Issue] = field(default_factory=list)
@@ -272,7 +272,9 @@ class ImportReport:
 # --- validation --------------------------------------------------------------
 
 
-def validate_import(batch: ImportBatch, lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> ImportReport:
+def validate_import(
+    batch: ImportBatch, lookback_days: int | None = DEFAULT_LOOKBACK_DAYS
+) -> ImportReport:
     report = ImportReport(lookback_days=lookback_days)
     for entity in ENTITIES:
         _validate_table(entity, batch.tables.get(entity), report)
@@ -565,12 +567,15 @@ def _warn_unreachable_touchpoints(report: ImportReport) -> None:
         )
         if reachable:
             continue
-        message = (
-            f"Contact {tp.contact_id!r} has no opportunities."
-            if not times
-            else f"Outside every {report.lookback_days}-day lookback window of contact "
-            f"{tp.contact_id!r}'s opportunities."
-        )
+        if not times:
+            message = f"Contact {tp.contact_id!r} has no opportunities."
+        elif report.lookback_days is None:
+            message = f"After every conversion of contact {tp.contact_id!r}'s opportunities."
+        else:
+            message = (
+                f"Outside every {report.lookback_days}-day lookback window of contact "
+                f"{tp.contact_id!r}'s opportunities."
+            )
         report.warnings.append(
             Issue(
                 "touchpoints",

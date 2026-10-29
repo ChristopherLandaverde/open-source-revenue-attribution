@@ -32,8 +32,8 @@ class JourneyStep:
 class Journey:
     conversion: Conversion
     model_name: str
-    lookback_days: int
-    window_start: datetime
+    lookback_days: int | None
+    window_start: datetime | None  # None: no lookback cap
     steps: tuple[JourneyStep, ...]
     credits: tuple[Credit, ...]
 
@@ -63,7 +63,7 @@ def build_journey(conversion: Conversion, model: AttributionModel) -> Journey:
             )
     steps = []
     for position, tp in enumerate(journey_order(conversion.touchpoints), start=1):
-        if tp.occurred_at < start:
+        if start is not None and tp.occurred_at < start:
             eligibility, credit = Eligibility.BEFORE_WINDOW, None
         elif tp.occurred_at > conversion.converted_at:
             eligibility, credit = Eligibility.AFTER_CONVERSION, None

@@ -1,7 +1,8 @@
 """Multi-touch models (attribution/models.py), written before the code.
 
 Every expected amount is calculated by hand in the comments. All conversions are
-1,000.00 USD at 2026-04-01 00:00 UTC with a 90-day lookback unless a test says otherwise.
+1,000.00 USD at 2026-04-01 00:00 UTC. Models default to no lookback cap (Dreamdata); tests
+that use FOUR pass a 90-day lookback so its 120-day-old touch is excluded.
 Credits always sum to the amount; leftover cents follow `allocate` (largest remainder,
 ties to the earlier touch in journey order).
 """
@@ -62,7 +63,9 @@ FOUR = (
     tp("t-after", -1),  # after the conversion: never credited
 )
 
+W90 = {"lookback_days": 90}
 ALL_MODELS = [FirstTouch(), LastTouch(), Linear(), PositionBased(), TimeDecay()]
+WINDOWED = [m(**W90) for m in (FirstTouch, LastTouch, Linear, PositionBased, TimeDecay)]
 
 
 # --- Last touch -------------------------------------------------------------------
@@ -70,7 +73,7 @@ ALL_MODELS = [FirstTouch(), LastTouch(), Linear(), PositionBased(), TimeDecay()]
 
 def test_last_touch_credits_latest_eligible():
     # Latest of {30, 20, 10, 2} days before is t-2 -> 1,000.00. t-after is excluded.
-    assert LastTouch().attribute(conversion(*FOUR)) == [
+    assert LastTouch(**W90).attribute(conversion(*FOUR)) == [
         Credit("opp-1", "t-2", "google / cpc / t-2", Decimal("1000.00"), "USD")
     ]
 
@@ -86,7 +89,7 @@ def test_last_touch_tie_goes_to_higher_id():
 
 def test_linear_splits_evenly():
     # 1,000.00 / 4 = 250.00 each, exact.
-    assert credits_by_id(Linear().attribute(conversion(*FOUR))) == {
+    assert credits_by_id(Linear(**W90).attribute(conversion(*FOUR))) == {
         "t-30": Decimal("250.00"),
         "t-20": Decimal("250.00"),
         "t-10": Decimal("250.00"),
@@ -127,7 +130,7 @@ def test_linear_repeated_campaign_keeps_one_credit_per_touch():
 
 def test_position_based_40_20_40():
     # 4 touches: first 40% = 400.00, last 40% = 400.00, middle 20% = 200.00 / 2 = 100.00 each.
-    assert credits_by_id(PositionBased().attribute(conversion(*FOUR))) == {
+    assert credits_by_id(PositionBased(**W90).attribute(conversion(*FOUR))) == {
         "t-30": Decimal("400.00"),
         "t-20": Decimal("100.00"),
         "t-10": Decimal("100.00"),
@@ -182,7 +185,7 @@ def test_time_decay_custom_half_life():
 # --- Shared behaviour -------------------------------------------------------------
 
 
-@pytest.mark.parametrize("model", ALL_MODELS, ids=lambda m: m.name)
+@pytest.mark.parametrize("model", WINDOWED, ids=lambda m: m.name)
 def test_no_eligible_touch_is_unattributed(model):
     got = model.attribute(conversion(tp("t-old", 120), tp("t-after", -1)))
     assert got == [Credit("opp-1", None, UNATTRIBUTED, Decimal("1000.00"), "USD")]
@@ -203,11 +206,30 @@ def test_same_input_same_output_whatever_the_input_order(model):
     assert model.attribute(conversion(*reversed(FOUR))) == forward
 
 
-@pytest.mark.parametrize("model", ALL_MODELS, ids=lambda m: m.name)
+@pytest.mark.parametrize("model", WINDOWED, ids=lambda m: m.name)
 def test_lookback_boundary_is_inclusive(model):
     # 90 days exactly is in; 91 is out. With one eligible touch every model gives it all.
     got = model.attribute(conversion(tp("t-91", 91), tp("t-90", 90)))
     assert credits_by_id(got) == {"t-90": Decimal("1000.00")}
+
+
+def test_default_has_no_lookback_cap():
+    # No cap (Dreamdata): the 120-day-old touch counts; the touch after the conversion never
+    # does. Linear over t-old, t-30, t-20, t-10, t-2 = 1,000.00 / 5 = 200.00 each.
+    got = Linear().attribute(conversion(*FOUR))
+    assert credits_by_id(got) == {
+        "t-old": Decimal("200.00"),
+        "t-30": Decimal("200.00"),
+        "t-20": Decimal("200.00"),
+        "t-10": Decimal("200.00"),
+        "t-2": Decimal("200.00"),
+    }
+
+
+@pytest.mark.parametrize("model", ALL_MODELS, ids=lambda m: m.name)
+def test_only_touches_after_conversion_is_unattributed(model):
+    got = model.attribute(conversion(tp("t-after", -1)))
+    assert got == [Credit("opp-1", None, UNATTRIBUTED, Decimal("1000.00"), "USD")]
 
 
 def test_standard_models_are_named_with_parameters():

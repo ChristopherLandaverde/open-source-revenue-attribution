@@ -34,7 +34,7 @@ def test_report_page_renders_with_model_and_window(client, sample):
     html = response.content.decode()
     assert response.status_code == 200
     assert "First-touch" in html
-    assert "90 days" in html
+    assert "No lookback cap" in html
     assert "google / cpc / q1-search" in html
     assert "not causal impact" in html
     assert 'hx-get="/"' in html

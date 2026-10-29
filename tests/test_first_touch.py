@@ -61,9 +61,16 @@ def test_touchpoint_at_conversion_time_is_eligible():
 
 
 def test_lookback_window_boundary_is_inclusive():
-    # Default window is 90 days: exactly 90 days before counts, 91 days does not.
-    credits = FirstTouch().attribute(conversion(tp("t-91", 91, "x"), tp("t-90", 90, "y")))
+    # With a 90-day window: exactly 90 days before counts, 91 days does not.
+    model = FirstTouch(lookback_days=90)
+    credits = model.attribute(conversion(tp("t-91", 91, "x"), tp("t-90", 90, "y")))
     assert credits[0].touchpoint_id == "t-90"
+
+
+def test_default_has_no_lookback_cap():
+    # No cap by default (Dreamdata): the 91-day-old touch is the earliest and wins.
+    credits = FirstTouch().attribute(conversion(tp("t-91", 91, "x"), tp("t-90", 90, "y")))
+    assert credits[0].touchpoint_id == "t-91"
 
 
 def test_custom_lookback_window():
@@ -73,8 +80,8 @@ def test_custom_lookback_window():
 
 
 def test_no_eligible_touchpoints_is_unattributed():
-    # Only touch is 120 days old -> outside window -> full 1000.00 to Unattributed.
-    credits = FirstTouch().attribute(conversion(tp("t-120", 120)))
+    # 90-day window, only touch is 120 days old -> outside -> full 1000.00 to Unattributed.
+    credits = FirstTouch(lookback_days=90).attribute(conversion(tp("t-120", 120)))
     assert credits == [Credit("opp-1", None, UNATTRIBUTED, Decimal("1000.00"), "USD")]
 
 

@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load windows %}
 {% block title %}Data validation · Open Source Revenue Attribution{% endblock %}
 {% block content %}
 <h1>Data validation</h1>
@@ -32,7 +32,7 @@
   <p class="context small">
     Last import: <span class="mono">{{ run.source }}</span> ·
     <span class="mono">{{ run.created_at|date:"Y-m-d H:i" }} UTC</span> ·
-    {{ run.lookback_days }}-day lookback{% if run.strict %} · strict mode{% endif %} ·
+    {{ run.lookback_days|window }}{% if run.strict %} · strict mode{% endif %} ·
     rules in <code>docs/contract.md</code>
   </p>
 

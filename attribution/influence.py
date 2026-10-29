@@ -13,7 +13,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 
-from attribution.types import UNATTRIBUTED, eligible_touchpoints
+from attribution.types import eligible_touchpoints
 
 
 @dataclass(frozen=True)
@@ -25,8 +25,11 @@ class InfluenceRow:
     touches: int  # eligible touches of this campaign across those conversions
 
 
-def influence_by_campaign(conversions, lookback_days: int) -> list[InfluenceRow]:
-    """One row per (campaign, currency). Conversions with no eligible touch go to Unattributed.
+def influence_by_campaign(conversions, lookback_days: int | None) -> list[InfluenceRow]:
+    """One row per (campaign, currency). Conversions with no eligible touch are left out.
+
+    As in Dreamdata, influence covers attributable deals only: a conversion with no eligible
+    touch influences nothing. The data readiness page counts those conversions instead.
 
     Rows sort by currency, then amount descending, then campaign key. Currencies never mix.
     """
@@ -38,8 +41,6 @@ def influence_by_campaign(conversions, lookback_days: int) -> list[InfluenceRow]
         per_campaign: dict[str, int] = defaultdict(int)
         for tp in eligible:
             per_campaign[tp.campaign_key] += 1
-        if not eligible:
-            per_campaign[UNATTRIBUTED] = 0
         for campaign, n in per_campaign.items():
             key = (campaign, conversion.currency)
             amounts[key] += conversion.amount

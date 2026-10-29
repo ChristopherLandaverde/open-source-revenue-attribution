@@ -1,14 +1,16 @@
 """Data readiness on the demo fixture. Expected counts are hand-calculated from
-sample_data/demo/README.md (90-day lookback):
+sample_data/demo/README.md (default: no lookback cap):
 
 pipeline, 6 opportunities
-  contact   5/6  opp-104 has no contact
+  contact   5/6  opp-104 has no contact (also the one opportunity left out of Influenced)
   tracked   5/5  every opportunity contact has touches
-  window    5/5  opp-101 tp-01/02, opp-102 tp-04, opp-103 tp-07/08, opp-105 tp-12, opp-106 tp-14
-  utm       6/7  eligible touches tp-01 02 04 07 08 12 14; tp-12 has only utm_source
+  window    5/5  a touch at or before the conversion: opp-101 tp-01/02, opp-102 tp-04,
+                 opp-103 tp-07/08, opp-105 tp-11/12, opp-106 tp-15/14
+  utm       8/9  those 9 eligible touches; tp-12 has only utm_source
 won, 3 opportunities (opp-101, opp-103, opp-105)
-  contact 3/3, tracked 3/3, window 3/3 (tp-03; tp-07 08 09; tp-13)
-  utm       3/5  tp-09 and tp-13 have no UTMs
+  contact 3/3, tracked 3/3, window 3/3 (tp-01 02 03; tp-07 08 09; tp-11 12 13)
+  utm       6/9  tp-09 and tp-13 have no UTMs, tp-12 only utm_source
+90-day window, pipeline: utm 6/7 (tp-11 and tp-15 drop out of the window)
 import      32 of 42 distinct rows loaded (43 received, 1 exact duplicate), 10 refused
 events      not checked: the demo loads no events
 """
@@ -43,7 +45,7 @@ def test_pipeline_readiness_matches_hand_count(sample):
         "contact": (REVIEW, 5, 6),
         "tracked": (PASS, 5, 5),
         "window": (PASS, 5, 5),
-        "utm": (REVIEW, 6, 7),
+        "utm": (REVIEW, 8, 9),
         "import": (REVIEW, 32, 42),
         "events": (NOT_CHECKED, None, None),
         "linked": (NOT_CHECKED, None, None),
@@ -53,6 +55,8 @@ def test_pipeline_readiness_matches_hand_count(sample):
     assert checks["utm"].examples == ["tp-12"]
     assert "tp-18" in checks["import"].examples
     assert result.opportunities == 6 and result.attributable == 5
+    assert result.no_touch == ["opp-104"]
+    assert checks["window"].title == "Touches happen before the conversion"
     assert checks["events"].finding == "No events collected yet."
 
 
@@ -60,8 +64,16 @@ def test_won_readiness_matches_hand_count(sample):
     result = readiness("won")
     assert summary(result)["contact"] == (PASS, 3, 3)
     assert summary(result)["window"] == (PASS, 3, 3)
-    assert summary(result)["utm"] == (REVIEW, 3, 5)
-    assert {c.key: c for c in result.checks}["utm"].examples == ["tp-09", "tp-13"]
+    assert summary(result)["utm"] == (REVIEW, 6, 9)
+    assert {c.key: c for c in result.checks}["utm"].examples == ["tp-09", "tp-12", "tp-13"]
+    assert result.no_touch == []
+
+
+def test_ninety_day_window_readiness(sample, settings):
+    settings.ATTRIBUTION_LOOKBACK_DAYS = 90
+    checks = {c.key: c for c in readiness("pipeline").checks}
+    assert (checks["utm"].count, checks["utm"].total) == (6, 7)
+    assert checks["window"].title == "Touches fall inside the lookback window"
 
 
 def test_every_check_to_fix_has_a_fix_and_a_verification(sample):
@@ -107,6 +119,7 @@ def test_readiness_page_renders_verdict_and_fixes(client, sample):
     assert "Fill contact_id" in html
     assert "Not checked" in html
     assert "No events collected yet." in html
+    assert "Left out of Influenced, as in Dreamdata: 1 opportunity with no eligible touch" in html
     assert client.get("/readiness/", {"metric": "nope"}).status_code == 400
 
 

@@ -49,7 +49,7 @@ def test_each_load_records_its_validation_report():
     run = ImportRun.objects.get()
     assert run.loaded is True
     assert run.source == "sample_data/demo"
-    assert run.lookback_days == 90
+    assert run.lookback_days is None  # no cap by default
     assert run.report["counts"]["opportunities"]["rejected"] == 4
 
 

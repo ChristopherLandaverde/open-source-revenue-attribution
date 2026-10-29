@@ -24,6 +24,6 @@
     </nav>
   </header>
   {% endwith %}
-  <main class="page">{% block content %}{% endblock %}</main>
+  <main class="{% block page_class %}page{% endblock %}">{% block content %}{% endblock %}</main>
 </body>
 </html>

@@ -2,10 +2,10 @@
 
 Definitions and sources: docs/research/m4-models.md. Deviations: docs/decisions.md.
 
-Each model weights the eligible touches of one conversion (inside the lookback window, oldest
-first, ties by touchpoint ID) and splits the amount by those weights at the currency's minor
-unit with `allocate`, so every model's credits sum exactly to the amount. No eligible touch
-means the whole amount goes to Unattributed.
+Each model weights the eligible touches of one conversion (at or before it, and inside the
+lookback window when one is set; oldest first, ties by touchpoint ID). It splits the amount by
+those weights at the currency's minor unit with `allocate`, so every model's credits sum
+exactly to the amount. No eligible touch means the whole amount goes to Unattributed.
 
 These are association rules with fixed parameters. None of them estimates causal impact.
 Data-driven (algorithmic) models are deliberately absent: see docs/decisions.md.
@@ -45,7 +45,7 @@ def _split(conversion: Conversion, touches: list[Touchpoint], weights: list) -> 
 class _Weighted:
     """Shared attribute(): eligible touches -> weights -> credits that sum to the amount."""
 
-    lookback_days: int
+    lookback_days: int | None
 
     def weights(self, touches: list[Touchpoint], conversion: Conversion) -> list:
         raise NotImplementedError
@@ -59,9 +59,10 @@ class _Weighted:
 
 @dataclass(frozen=True)
 class LastTouch(_Weighted):
-    lookback_days: int = DEFAULT_LOOKBACK_DAYS
+    lookback_days: int | None = DEFAULT_LOOKBACK_DAYS
     name: str = "Last-touch"
     parameters: str = "100% to the latest eligible touch"
+    standard: str = "Dreamdata, HockeyStack, GA4 last click"
 
     def attribute(self, conversion: Conversion) -> list[Credit]:
         touches = eligible_touchpoints(conversion, self.lookback_days)
@@ -72,9 +73,10 @@ class LastTouch(_Weighted):
 
 @dataclass(frozen=True)
 class Linear(_Weighted):
-    lookback_days: int = DEFAULT_LOOKBACK_DAYS
+    lookback_days: int | None = DEFAULT_LOOKBACK_DAYS
     name: str = "Linear"
     parameters: str = "Equal share to every eligible touch"
+    standard: str = "Dreamdata, HockeyStack, GA4 (legacy)"
 
     def weights(self, touches, conversion):
         return [1] * len(touches)
@@ -85,15 +87,16 @@ class PositionBased(_Weighted):
     """U-shaped: 40% to the first touch, 40% to the last, 20% shared by the touches between.
 
     Split as Dreamdata, GA4 (legacy) and HockeyStack define it. One touch gets 100%. Two touches
-    get 50% each: with no touch between, the middle 20% is shared equally by first and last.
-    None of the sources documents the one- and two-touch cases; this is our reading
-    (docs/decisions.md, flagged for review).
+    get 50% each. No vendor documents these two cases (Dreamdata, GA4, HockeyStack, HubSpot);
+    100% and 50/50 are the only splits that keep the sum and treat first and last alike
+    (docs/decisions.md).
     """
 
-    lookback_days: int = DEFAULT_LOOKBACK_DAYS
+    lookback_days: int | None = DEFAULT_LOOKBACK_DAYS
     first_percent: int = 40
     last_percent: int = 40
     name: str = "Position-based (U-shaped)"
+    standard: str = "Dreamdata U-shaped, GA4 (legacy), HockeyStack"
 
     @property
     def parameters(self) -> str:
@@ -121,9 +124,10 @@ class TimeDecay(_Weighted):
     model. Weights are normalised so credits still sum to the amount.
     """
 
-    lookback_days: int = DEFAULT_LOOKBACK_DAYS
+    lookback_days: int | None = DEFAULT_LOOKBACK_DAYS
     half_life_days: int = 7
     name: str = "Time decay"
+    standard: str = "GA4 (legacy) and HockeyStack, 7-day half-life; Dreamdata has no time decay"
 
     @property
     def parameters(self) -> str:
@@ -137,7 +141,7 @@ class TimeDecay(_Weighted):
         ]
 
 
-def standard_models(lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> list:
+def standard_models(lookback_days: int | None = DEFAULT_LOOKBACK_DAYS) -> list:
     """The models shown side by side, in the order the comparison lists them."""
     return [
         FirstTouch(lookback_days=lookback_days),

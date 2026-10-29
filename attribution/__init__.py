@@ -20,6 +20,7 @@ from attribution.types import (
     Credit,
     Touchpoint,
     allocate,
+    describe_window,
     eligible_touchpoints,
     summarize_by_campaign,
 )
@@ -31,6 +32,7 @@ __all__ = [
     "PositionBased",
     "TimeDecay",
     "allocate",
+    "describe_window",
     "influence_by_campaign",
     "standard_models",
     "DEFAULT_LOOKBACK_DAYS",

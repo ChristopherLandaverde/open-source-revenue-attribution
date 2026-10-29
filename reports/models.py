@@ -91,7 +91,7 @@ class ImportRun(models.Model):
 
     source = models.CharField(max_length=500)
     created_at = models.DateTimeField(auto_now_add=True)
-    lookback_days = models.PositiveIntegerField()
+    lookback_days = models.PositiveIntegerField(null=True, blank=True)  # None: no cap
     strict = models.BooleanField(default=False)
     loaded = models.BooleanField(help_text="False when a strict import refused everything.")
     report = models.JSONField()  # contracts.ImportReport.to_dict()

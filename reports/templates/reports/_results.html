@@ -1,4 +1,4 @@
-{% load money %}<section id="results" aria-live="polite">
+{% load money windows %}<section id="results" aria-live="polite">
   {% if not report.opportunities %}
     <div class="empty">
       <p><strong>No opportunities yet.</strong></p>
@@ -21,22 +21,22 @@
   {% endwith %}
 
   <p class="context">
-    Lookback window: <strong>{{ report.lookback_days }} days</strong> ·
+    Window: <strong>{{ report.lookback_days|window }}</strong> ·
     Amount: <strong>{{ report.metric_label }}</strong>
   </p>
 
   <h2>Models in this comparison</h2>
   <dl class="codes">
     {% for model in report.models %}
-      <dt><strong>{{ model.name }}</strong></dt><dd>{{ model.parameters }}; {{ report.lookback_days }}-day lookback.</dd>
+      <dt><strong>{{ model.name }}</strong></dt><dd>{{ model.parameters }}. <span class="muted small">As defined by {{ model.standard }}.</span></dd>
     {% endfor %}
-    <dt><strong>Influenced</strong></dt><dd>The full amount of every opportunity with at least one eligible touch from the campaign. One opportunity counts for every campaign that touched it, so this column overlaps and is never summed.</dd>
+    <dt><strong>Influenced</strong></dt><dd>The full amount of every opportunity with at least one eligible touch from the campaign. One opportunity counts for every campaign that touched it, so this column overlaps and is never summed. Opportunities with no eligible touch are left out, as in Dreamdata. <span class="muted small">As defined by Dreamdata.</span></dd>
   </dl>
 
   {% for block in report.blocks %}
   <h2>Credit by campaign · <span class="mono">{{ block.currency }}</span></h2>
   <p class="context small">{{ block.opportunities }} opportunit{{ block.opportunities|pluralize:"y,ies" }} worth {{ block.total|minor_unit:block.currency }} {{ block.currency }}.
-    Each model column adds up to that total.{% if block.unattributed %} {{ block.unattributed|minor_unit:block.currency }} is Unattributed under every model: no eligible touch.{% endif %}</p>
+    Each model column adds up to that total.{% if block.unattributed %} {{ block.unattributed|minor_unit:block.currency }} is Unattributed under every model: no eligible touch, so it is not in Influenced either.{% endif %}</p>
   <div class="table-wrap">
   <table class="compare-table">
     <thead><tr>
@@ -49,7 +49,7 @@
       <tr>
         <th scope="row" class="mono">{% if row.unattributed %}Unattributed <span class="muted small">(no eligible touch)</span>{% else %}{{ row.campaign_key }}{% endif %}</th>
         {% for amount in row.credits %}<td class="num">{% if amount %}{{ amount|minor_unit:block.currency }}{% else %}<span class="muted">0</span>{% endif %}</td>{% endfor %}
-        <td class="num influence">{{ row.influenced|minor_unit:block.currency }}<br><span class="small muted">{{ row.influenced_opportunities }} opp.</span></td>
+        <td class="num influence">{% if row.unattributed %}<span class="small muted">Not counted</span>{% else %}{{ row.influenced|minor_unit:block.currency }}<br><span class="small muted">{{ row.influenced_opportunities }} opp.</span>{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>
@@ -63,7 +63,7 @@
   {% endfor %}
 
   <h2>Credit by opportunity</h2>
-  <p class="context small">Each cell lists the credited touches and their amounts. A journey lists every touch and why it is or isn't eligible; it shows first-touch credit only.</p>
+  <p class="context small">Each cell lists the credited touches and their amounts. A journey lists every touch, why it is or isn't eligible, and each model's credit for it.</p>
   <div class="table-wrap">
   <table class="compare-table">
     <thead><tr><th scope="col">Opportunity <span class="muted">(open journey)</span></th><th scope="col">Conversion time</th>

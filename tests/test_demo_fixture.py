@@ -53,12 +53,24 @@ def test_fixture_is_synthetic(report):
         assert contact.email.endswith(".example")
 
 
+# (lookback setting, where its expectations live): the default is no cap.
+WINDOWS = [(None, ()), (90, ("lookback_90",))]
+
+
+def expected_for(data, path, metric):
+    for key in path:
+        data = data[key]
+    return data[metric]
+
+
 @pytest.mark.django_db
+@pytest.mark.parametrize("lookback,path", WINDOWS, ids=["no-cap", "90-day"])
 @pytest.mark.parametrize("metric", ["pipeline", "won"])
-def test_first_touch_matches_hand_calculation(metric):
+def test_first_touch_matches_hand_calculation(metric, lookback, path, settings):
+    settings.ATTRIBUTION_LOOKBACK_DAYS = lookback
     call_command("load_sample_data", verbosity=0)
     result = first_touch_report(metric)
-    expected = EXPECTED_FIRST_TOUCH[metric]
+    expected = expected_for(EXPECTED_FIRST_TOUCH, path, metric)
 
     got_opportunities = [
         [
@@ -102,8 +114,10 @@ EXPECTED_MODELS = json.loads((DEMO / "expected" / "models.json").read_text())
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("lookback,path", WINDOWS, ids=["no-cap", "90-day"])
 @pytest.mark.parametrize("metric", ["pipeline", "won"])
-def test_model_comparison_matches_hand_calculation(metric):
+def test_model_comparison_matches_hand_calculation(metric, lookback, path, settings):
+    settings.ATTRIBUTION_LOOKBACK_DAYS = lookback
     call_command("load_sample_data", verbosity=0)
     result = comparison_report(metric)
     assert [m.name for m in result.models] == EXPECTED_MODELS["models"]
@@ -125,7 +139,7 @@ def test_model_comparison_matches_hand_calculation(metric):
                 for key, credits, influenced, n in block["rows"]
             ],
         }
-        for currency, block in EXPECTED_MODELS[metric].items()
+        for currency, block in expected_for(EXPECTED_MODELS, path, metric).items()
     }
     assert got == expected
     # Every model's column reconciles to the currency's total; influence overlaps.
