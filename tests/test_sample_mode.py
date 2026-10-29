@@ -64,3 +64,9 @@ def test_report_copy_never_claims_causation(client, sample):
     html = client.get("/").content.decode().lower()
     for phrase in ("caused by", "drove revenue", "impact of", "roi"):
         assert phrase not in html
+
+
+def test_amounts_display_at_the_currency_minor_unit(client, sample):
+    html = client.get("/").content.decode()
+    assert "1200000 JPY" in html and "1200000.00" not in html
+    assert "18500.50 EUR" in html
