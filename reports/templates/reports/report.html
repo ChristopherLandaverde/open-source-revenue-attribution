@@ -1,11 +1,12 @@
 {% extends "base.html" %}
-{% block title %}First-touch report · Open Source Revenue Attribution{% endblock %}
+{% block page_class %}page page-wide{% endblock %}
+{% block title %}Model comparison · Open Source Revenue Attribution{% endblock %}
 {% block content %}
-<h1>{{ report.model_name }} attribution report</h1>
+<h1>Model comparison</h1>
 <p class="notice">
-  This report shows how the <strong>{{ report.model_name }}</strong> model assigns credit to
-  touchpoints associated with each opportunity. It describes association under a named rule,
-  not causal impact: it does not show that a campaign caused a deal.
+  Each column applies one named rule to the same touches. The numbers show association under
+  that rule, not causal impact: no column shows that a campaign caused a deal. A gap between
+  columns is the rules' difference, not a measured lift.
 </p>
 
 <form class="controls" hx-get="{% url 'reports:report' %}" hx-target="#results" hx-indicator="#results" hx-swap="outerHTML"

@@ -13,8 +13,10 @@ from attribution.types import (
 
 @dataclass(frozen=True)
 class FirstTouch:
-    lookback_days: int = DEFAULT_LOOKBACK_DAYS
+    lookback_days: int | None = DEFAULT_LOOKBACK_DAYS
     name: str = "First-touch"
+    parameters: str = "100% to the earliest eligible touch"
+    standard: str = "Dreamdata, HockeyStack, GA4 (legacy)"
 
     def attribute(self, conversion: Conversion) -> list[Credit]:
         eligible = eligible_touchpoints(conversion, self.lookback_days)

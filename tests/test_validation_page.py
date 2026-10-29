@@ -24,7 +24,7 @@ def test_page_shows_counts_and_refused_rows(client, loaded):
     html = response.content.decode()
     assert response.status_code == 200
     assert "sample_data/demo" in html
-    assert "90-day lookback" in html
+    assert "No lookback cap" in html
     # opportunities.csv: 10 received, 6 accepted, 4 refused
     assert '<th scope="row">opportunities.csv</th><td class="num">10</td>' in html
     assert "INVALID_ID" in html and "acc beta" in html

@@ -36,6 +36,7 @@ a:hover { text-decoration-thickness: 2px; }
 .site-nav a[aria-current="page"] { border-bottom-color: var(--ink-primary); font-weight: 600; }
 
 .page { max-width: 68rem; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-7); }
+.page-wide { max-width: 90rem; }
 
 /* Text roles */
 .verdict { font-size: var(--text-title); font-weight: 600; line-height: 1.25; margin-bottom: var(--space-2); }
@@ -150,8 +151,23 @@ pre code { font-size: var(--text-small); }
 /* Journey totals */
 tfoot th, tfoot td { font-weight: 600; border-top: 1px solid var(--ink-primary); border-bottom: none; }
 tfoot th { text-align: right; }
-.journey-table { min-width: 60rem; }  /* scrolls sideways on phones instead of 1-word columns */
+.journey-table { min-width: 64rem; }
+.journey-table caption { text-align: left; caption-side: top; padding-bottom: var(--space-2); }  /* scrolls sideways on phones instead of 1-word columns */
 /* #7: a session's later page views sit under its touch, indented and quieter. */
 .journey-table tr.in-session td { color: var(--ink-secondary); background: var(--surface-raised); padding-top: var(--space-1); padding-bottom: var(--space-1); }
 .journey-table tr.in-session td:nth-child(3) { padding-left: var(--space-5); }
 .nowrap { white-space: nowrap; }
+
+/* Model comparison and data readiness (M4) */
+.compare-table { min-width: 52rem; }
+.compare-table tbody th { font-weight: 400; text-align: left; }
+.compare-table .influence { border-left: 2px solid var(--line-control); }
+.compare-table tfoot th, .compare-table tfoot td { font-weight: 600; }
+.findings { list-style: none; padding: 0; margin: 0 0 var(--space-5); }
+.finding { padding: var(--space-3) 0; border-top: 1px solid var(--line-subtle); }
+.finding-head { margin-bottom: var(--space-2); }
+.passes { margin: var(--space-4) 0; }
+.passes summary { cursor: pointer; font-weight: 600; padding: var(--space-1) 0; }
+.sans { font-family: var(--font-sans); }
+.journey-table td:nth-child(4) { min-width: 11rem; max-width: 15rem; overflow-wrap: anywhere; }
+.journey-table td.num { white-space: nowrap; }

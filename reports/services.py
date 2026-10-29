@@ -9,7 +9,7 @@ from django.db.models import Count, Prefetch
 
 import attribution
 from collection.services import convert_events
-from contracts import RejectReason, WarningCode
+from contracts import CURRENCY_MINOR_UNITS, RejectReason, WarningCode
 from contracts.touchpoints import TouchReason
 from reports.fixes import FIXES
 from reports.models import ImportRun, Opportunity, Touchpoint
@@ -32,7 +32,7 @@ class Report:
     metric: str
     metric_label: str
     model_name: str
-    lookback_days: int
+    lookback_days: int | None
     campaign_rows: list[tuple[str, str, Decimal, int]]
     opportunity_rows: list[OpportunityRow]
 
@@ -45,6 +45,7 @@ def to_conversion(opportunity: Opportunity, metric: str) -> attribution.Conversi
         amount=opportunity.amount,
         currency=opportunity.currency,
         converted_at=converted_at,
+        minor_unit=CURRENCY_MINOR_UNITS.get(opportunity.currency, 2),
         touchpoints=tuple(
             attribution.Touchpoint(
                 id=tp.external_id,
@@ -148,8 +149,7 @@ VISIT_RULE_TEXT = {
 }
 STATUS = {
     # status: (symbol and word, tag class)
-    "credited": ("✓ Credited", "tag-accepted"),
-    "eligible": ("□ Eligible", "tag-observed"),
+    "eligible": ("✓ Eligible", "tag-accepted"),
     "before": ("– Before window", "tag-neutral"),
     "after": ("– After conversion", "tag-neutral"),
     "in_session": ("– In session", "tag-neutral"),
@@ -174,7 +174,7 @@ class JourneyRow:
     status_label: str
     status_class: str
     window_text: str
-    credit: Decimal | None
+    credits: list  # per model (JourneyView.models order); None when ineligible or in-session
 
 
 @dataclass(frozen=True)
@@ -183,8 +183,8 @@ class JourneyView:
     metric: str
     metric_label: str
     won: bool
-    model_name: str
-    lookback_days: int
+    models: list  # ModelColumn, one credit column each
+    lookback_days: int | None
     journey: attribution.Journey | None  # None when the metric does not apply (open + won)
     rows: list[JourneyRow]
     eligible_count: int
@@ -192,7 +192,9 @@ class JourneyView:
 
 
 def _window_text(status: str, journey: attribution.Journey) -> str:
-    if status in ("credited", "eligible"):
+    if status == "eligible":
+        if journey.window_start is None:
+            return "At or before the conversion."
         return "Inside the window."
     if status == "before":
         return f"Before the window opened ({journey.window_start:%Y-%m-%d %H:%M} UTC)."
@@ -217,7 +219,7 @@ def _row(
     session_number=None,
     session_size=0,
     position=None,
-    credit=None,
+    credits=None,
 ) -> JourneyRow:
     label, css = STATUS[status]
     return JourneyRow(
@@ -237,7 +239,7 @@ def _row(
         status_label=label,
         status_class=css,
         window_text=_window_text(status, journey),
-        credit=credit,
+        credits=credits or [],
     )
 
 
@@ -263,10 +265,10 @@ def _session_row(view, journey: attribution.Journey, number=None, position=None)
 
 
 def journey_view(opportunity: Opportunity, metric: str = "pipeline") -> JourneyView:
-    """Every touch of the opportunity's contact, why it is (in)eligible, and its credit."""
+    """Every touch of the opportunity's contact, why it is (in)eligible, and each model's credit."""
     if metric not in METRICS:
         raise ValueError(f"Unknown metric: {metric}")
-    model = attribution.FirstTouch(lookback_days=settings.ATTRIBUTION_LOOKBACK_DAYS)
+    models = attribution.standard_models(lookback_days=settings.ATTRIBUTION_LOOKBACK_DAYS)
     won = opportunity.stage == Opportunity.Stage.WON
     contact = opportunity.contact
     db_touchpoints = (
@@ -284,8 +286,8 @@ def journey_view(opportunity: Opportunity, metric: str = "pipeline") -> JourneyV
         metric=metric,
         metric_label=METRICS[metric],
         won=won,
-        model_name=model.name,
-        lookback_days=model.lookback_days,
+        models=[ModelColumn(m.name, m.parameters, m.standard) for m in models],
+        lookback_days=settings.ATTRIBUTION_LOOKBACK_DAYS,
         other_contacts=others,
     )
     if metric == "won" and not won:
@@ -309,8 +311,11 @@ def journey_view(opportunity: Opportunity, metric: str = "pipeline") -> JourneyV
         currency=opportunity.currency,
         converted_at=converted_at,
         touchpoints=tuple(pure),
+        minor_unit=CURRENCY_MINOR_UNITS.get(opportunity.currency, 2),
     )
-    journey = attribution.build_journey(conversion, model)
+    # One journey per model: same steps in the same order, different credits.
+    journeys = [attribution.build_journey(conversion, model) for model in models]
+    journey = journeys[0]
 
     # Later page views of each session (#7): shown under their session, never counted again.
     in_session: dict[str, list] = {}
@@ -320,10 +325,10 @@ def journey_view(opportunity: Opportunity, metric: str = "pipeline") -> JourneyV
                 in_session.setdefault(page_view.session_id, []).append(page_view)
 
     rows, sessions = [], 0
-    for step in journey.steps:
+    for index, step in enumerate(journey.steps):
         record = record_for[id(step.touchpoint)]
         if step.eligibility == attribution.Eligibility.ELIGIBLE:
-            status = "credited" if step.credit else "eligible"
+            status = "eligible"
         else:
             status = "before" if step.eligibility == "before_window" else "after"
         session = {}
@@ -351,7 +356,7 @@ def journey_view(opportunity: Opportunity, metric: str = "pipeline") -> JourneyV
                 status=status,
                 journey=journey,
                 position=step.position,
-                credit=step.credit,
+                credits=[j.steps[index].credit for j in journeys],
                 **session,
             )
         )
@@ -363,3 +368,131 @@ def journey_view(opportunity: Opportunity, metric: str = "pipeline") -> JourneyV
     rows.extend(_session_row(v, journey) for v in leftovers)
     eligible = sum(1 for s in journey.steps if s.eligibility == attribution.Eligibility.ELIGIBLE)
     return view(journey=journey, rows=rows, eligible_count=eligible)
+
+
+# --- Model comparison (M4) ---------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ModelColumn:
+    name: str
+    parameters: str
+    standard: str = ""
+
+
+@dataclass(frozen=True)
+class ComparisonRow:
+    campaign_key: str
+    currency: str
+    credits: list[Decimal]  # one per model, in ModelColumn order
+    influenced: Decimal  # full amount of every opportunity it touched (overlaps)
+    influenced_opportunities: int
+
+    @property
+    def unattributed(self) -> bool:
+        return self.campaign_key == attribution.UNATTRIBUTED
+
+
+@dataclass(frozen=True)
+class CurrencyBlock:
+    currency: str
+    rows: list[ComparisonRow]
+    total: Decimal  # the opportunities' amount; every model's column sums to it
+    opportunities: int
+    unattributed: Decimal  # the same under every model: no eligible touch
+
+
+@dataclass(frozen=True)
+class OpportunityComparison:
+    opportunity: Opportunity
+    converted_at: object
+    credits: list[list[attribution.Credit]]  # per model
+
+
+@dataclass(frozen=True)
+class Comparison:
+    metric: str
+    metric_label: str
+    lookback_days: int | None
+    models: list[ModelColumn]
+    blocks: list[CurrencyBlock]
+    opportunities: list[OpportunityComparison]
+
+
+def _conversions(metric: str) -> list[tuple[Opportunity, attribution.Conversion]]:
+    touchpoints = Touchpoint.objects.order_by("occurred_at", "external_id", "origin")
+    opportunities = Opportunity.objects.select_related("account", "contact").prefetch_related(
+        Prefetch("contact__touchpoints", queryset=touchpoints)
+    )
+    if metric == "won":
+        opportunities = opportunities.filter(stage=Opportunity.Stage.WON)
+    return [(o, to_conversion(o, metric)) for o in opportunities.order_by("external_id")]
+
+
+def comparison_report(metric: str = "pipeline") -> Comparison:
+    """Every standard model's credit per campaign, beside the influenced amount, per currency."""
+    if metric not in METRICS:
+        raise ValueError(f"Unknown metric: {metric}")
+    lookback = settings.ATTRIBUTION_LOOKBACK_DAYS
+    models = attribution.standard_models(lookback_days=lookback)
+    pairs = _conversions(metric)
+    conversions = [c for _, c in pairs]
+
+    per_model = []  # per model: {(campaign, currency): amount}
+    opportunity_rows = []
+    model_credits = [[m.attribute(c) for c in conversions] for m in models]
+    for credits_by_conversion in model_credits:
+        flat = [credit for credits in credits_by_conversion for credit in credits]
+        per_model.append(
+            {(k, cur): amount for k, cur, amount, _ in attribution.summarize_by_campaign(flat)}
+        )
+    for i, (opportunity, conversion) in enumerate(pairs):
+        opportunity_rows.append(
+            OpportunityComparison(
+                opportunity, conversion.converted_at, [mc[i] for mc in model_credits]
+            )
+        )
+    influence = {
+        (r.campaign_key, r.currency): r
+        for r in attribution.influence_by_campaign(conversions, lookback)
+    }
+
+    keys = set(influence)
+    for totals in per_model:
+        keys |= set(totals)
+    blocks = []
+    for currency in sorted({cur for _, cur in keys}):
+        rows = []
+        for campaign in {k for k, cur in keys if cur == currency}:
+            key = (campaign, currency)
+            row_influence = influence.get(key)
+            rows.append(
+                ComparisonRow(
+                    campaign_key=campaign,
+                    currency=currency,
+                    credits=[totals.get(key, Decimal("0")) for totals in per_model],
+                    influenced=row_influence.amount if row_influence else Decimal("0"),
+                    influenced_opportunities=row_influence.conversions if row_influence else 0,
+                )
+            )
+        # Unattributed last; otherwise the largest influence first, then the largest credit.
+        rows.sort(key=lambda r: (r.unattributed, -r.influenced, -max(r.credits), r.campaign_key))
+        in_currency = [c for c in conversions if c.currency == currency]
+        unattributed_row = next((r for r in rows if r.unattributed), None)
+        blocks.append(
+            CurrencyBlock(
+                currency=currency,
+                rows=rows,
+                total=sum((c.amount for c in in_currency), Decimal("0")),
+                opportunities=len(in_currency),
+                unattributed=unattributed_row.credits[0] if unattributed_row else Decimal("0"),
+            )
+        )
+    return Comparison(
+        metric=metric,
+        metric_label=METRICS[metric],
+        lookback_days=lookback,
+        models=[ModelColumn(m.name, m.parameters, m.standard) for m in models],
+        blocks=blocks,
+        opportunities=opportunity_rows,
+    )

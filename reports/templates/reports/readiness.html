@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Data readiness · Open Source Revenue Attribution{% endblock %}
+{% block content %}
+<h1>Data readiness</h1>
+<p class="context">What to fix in your data before you trust the model comparison. Each check
+  counts against its denominator, for the amount selected below.</p>
+
+<form class="controls" hx-get="{% url 'reports:readiness' %}" hx-target="#results" hx-indicator="#results" hx-swap="outerHTML"
+      hx-trigger="change" hx-push-url="true">
+  <fieldset>
+    <legend>Amount to check</legend>
+    {% for value, label in metrics.items %}
+      <label>
+        <input type="radio" name="metric" value="{{ value }}" {% if value == view.metric %}checked{% endif %}>
+        {{ label }}
+      </label>
+    {% endfor %}
+  </fieldset>
+  <noscript><button class="button" type="submit">Show selected amount</button></noscript>
+</form>
+
+{% include "reports/_readiness.html" %}
+{% endblock %}

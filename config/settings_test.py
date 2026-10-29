@@ -8,3 +8,5 @@ from config.settings import *  # noqa: E402,F403
 
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+# Tests run with the default (no lookback cap) whatever a local .env says.
+ATTRIBUTION_LOOKBACK_DAYS = None

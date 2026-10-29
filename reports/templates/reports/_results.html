@@ -1,45 +1,82 @@
-{% load money %}<section id="results" aria-live="polite">
-  <p class="context">
-    Model: <strong>{{ report.model_name }}</strong> ·
-    Lookback window: <strong>{{ report.lookback_days }} days</strong> ·
-    Amount: <strong>{{ report.metric_label }}</strong>
-  </p>
-
-  {% if not report.opportunity_rows %}
+{% load money windows %}<section id="results" aria-live="polite">
+  {% if not report.opportunities %}
     <div class="empty">
       <p><strong>No opportunities yet.</strong></p>
       <p>Import CSVs on the <a href="{% url 'reports:import' %}">Import CSV</a> page, or run
         <code>uv run python manage.py load_sample_data</code>.</p>
     </div>
   {% else %}
-  <h2>Credit by campaign</h2>
+  {% with fix=readiness.to_fix %}
+  {% if fix %}
+    <p class="verdict"><span class="tag tag-review">! Fix data first</span>
+      {{ fix|length }} data check{{ fix|length|pluralize:" needs,s need" }} a fix before you trust these numbers.
+      {{ readiness.attributable }} of {{ readiness.opportunities }} opportunities have an eligible touch.</p>
+    <p class="context">Top fix: {{ fix.0.finding }} {{ fix.0.fix }}
+      <a href="{% url 'reports:readiness' %}?metric={{ report.metric }}">Open data readiness</a></p>
+  {% else %}
+    <p class="verdict"><span class="tag tag-accepted">✓ Data ready</span>
+      {{ readiness.attributable }} of {{ readiness.opportunities }} opportunities have an eligible touch, and every data check that could run passed.</p>
+    <p class="context"><a href="{% url 'reports:readiness' %}?metric={{ report.metric }}">Open data readiness</a>{% if readiness.not_checked %} · {{ readiness.not_checked|length }} check{{ readiness.not_checked|length|pluralize }} not run yet{% endif %}</p>
+  {% endif %}
+  {% endwith %}
+
+  <p class="context">
+    Window: <strong>{{ report.lookback_days|window }}</strong> ·
+    Amount: <strong>{{ report.metric_label }}</strong>
+  </p>
+
+  <h2>Models in this comparison</h2>
+  <dl class="codes">
+    {% for model in report.models %}
+      <dt><strong>{{ model.name }}</strong></dt><dd>{{ model.parameters }}. <span class="muted small">As defined by {{ model.standard }}.</span></dd>
+    {% endfor %}
+    <dt><strong>Influenced</strong></dt><dd>The full amount of every opportunity with at least one eligible touch from the campaign. One opportunity counts for every campaign that touched it, so this column overlaps and is never summed. Opportunities with no eligible touch are left out, as in Dreamdata. <span class="muted small">As defined by Dreamdata.</span></dd>
+  </dl>
+
+  {% for block in report.blocks %}
+  <h2>Credit by campaign · <span class="mono">{{ block.currency }}</span></h2>
+  <p class="context small">{{ block.opportunities }} opportunit{{ block.opportunities|pluralize:"y,ies" }} worth {{ block.total|minor_unit:block.currency }} {{ block.currency }}.
+    Each model column adds up to that total.{% if block.unattributed %} {{ block.unattributed|minor_unit:block.currency }} is Unattributed under every model: no eligible touch, so it is not in Influenced either.{% endif %}</p>
   <div class="table-wrap">
-  <table>
-    <thead><tr><th scope="col">Source / medium / campaign</th><th scope="col">Currency</th>
-      <th scope="col" class="num">Credited amount</th><th scope="col" class="num">Opportunities</th></tr></thead>
+  <table class="compare-table">
+    <thead><tr>
+      <th scope="col">Source / medium / campaign</th>
+      {% for model in report.models %}<th scope="col" class="num">{{ model.name }}</th>{% endfor %}
+      <th scope="col" class="num influence">Influenced <span class="muted">(overlaps)</span></th>
+    </tr></thead>
     <tbody>
-    {% for campaign, currency, amount, count in report.campaign_rows %}
-      <tr><td class="mono">{{ campaign }}</td><td class="mono">{{ currency }}</td><td class="num">{{ amount|minor_unit:currency }}</td><td class="num">{{ count }}</td></tr>
+    {% for row in block.rows %}
+      <tr>
+        <th scope="row" class="mono">{% if row.unattributed %}Unattributed <span class="muted small">(no eligible touch)</span>{% else %}{{ row.campaign_key }}{% endif %}</th>
+        {% for amount in row.credits %}<td class="num">{% if amount %}{{ amount|minor_unit:block.currency }}{% else %}<span class="muted">0</span>{% endif %}</td>{% endfor %}
+        <td class="num influence">{% if row.unattributed %}<span class="small muted">Not counted</span>{% else %}{{ row.influenced|minor_unit:block.currency }}<br><span class="small muted">{{ row.influenced_opportunities }} opp.</span>{% endif %}</td>
+      </tr>
     {% endfor %}
     </tbody>
+    <tfoot><tr>
+      <th scope="row">Total</th>
+      {% for model in report.models %}<td class="num">{{ block.total|minor_unit:block.currency }}</td>{% endfor %}
+      <td class="num influence small">Not additive</td>
+    </tr></tfoot>
   </table>
   </div>
+  {% endfor %}
 
   <h2>Credit by opportunity</h2>
+  <p class="context small">Each cell lists the credited touches and their amounts. A journey lists every touch, why it is or isn't eligible, and each model's credit for it.</p>
   <div class="table-wrap">
-  <table>
-    <thead><tr><th scope="col">Opportunity <span class="muted">(open journey)</span></th><th scope="col">Account</th><th scope="col">Conversion time</th>
-      <th scope="col">Credited touchpoint</th><th scope="col">Source / medium / campaign</th>
-      <th scope="col" class="num">Credited amount</th></tr></thead>
+  <table class="compare-table">
+    <thead><tr><th scope="col">Opportunity <span class="muted">(open journey)</span></th><th scope="col">Conversion time</th>
+      {% for model in report.models %}<th scope="col">{{ model.name }}</th>{% endfor %}</tr></thead>
     <tbody>
-    {% for row in report.opportunity_rows %}
+    {% for row in report.opportunities %}
       <tr>
-        <td><a href="{% url 'reports:journey' row.opportunity.external_id %}?metric={{ report.metric }}">{{ row.opportunity.name|default:row.opportunity.external_id }}</a></td>
-        <td>{{ row.opportunity.account.name|default:row.opportunity.account.external_id }}</td>
+        <th scope="row"><a href="{% url 'reports:journey' row.opportunity.external_id %}?metric={{ report.metric }}">{{ row.opportunity.name|default:row.opportunity.external_id }}</a><br>
+          <span class="small muted mono">{{ row.opportunity.amount|minor_unit:row.opportunity.currency }} {{ row.opportunity.currency }}</span></th>
         <td class="mono">{{ row.converted_at|date:"Y-m-d H:i" }} UTC</td>
-        <td class="mono">{{ row.credit.touchpoint_id|default:"None eligible" }}</td>
-        <td class="mono">{{ row.credit.campaign_key }}</td>
-        <td class="num">{{ row.credit.amount|minor_unit:row.credit.currency }} {{ row.credit.currency }}</td>
+        {% for credits in row.credits %}
+        <td class="small">{% for credit in credits %}{% if credit.amount or not credit.touchpoint_id %}<span class="mono">{% if credit.touchpoint_id %}{{ credit.touchpoint_id }}{% else %}Unattributed{% endif %} {{ credit.amount|minor_unit:credit.currency }}</span><br>{% endif %}{% endfor %}</td>
+        {% endfor %}
       </tr>
     {% endfor %}
     </tbody>

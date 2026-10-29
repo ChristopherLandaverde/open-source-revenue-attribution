@@ -41,15 +41,15 @@ def valid_rows():
     }
 
 
-def run(**overrides):
-    """Validate the valid batch with some entity's rows replaced or patched."""
+def run(lookback_days=None, **overrides):
+    """Validate the valid batch with some entity's rows replaced or patched (default: no cap)."""
     rows = valid_rows()
     for entity, value in overrides.items():
         if isinstance(value, dict):  # patch the first row
             rows[entity] = [{**rows[entity][0], **value}]
         else:
             rows[entity] = value
-    return validate_import(ImportBatch.from_rows(**rows))
+    return validate_import(ImportBatch.from_rows(**rows), lookback_days=lookback_days)
 
 
 def reject_codes(report, entity=None):
@@ -322,9 +322,17 @@ def test_partially_missing_campaign_fields_warn_but_are_kept_blank():
 
 
 def test_touchpoint_outside_every_lookback_window_warns():
-    # Pipeline window: [2026-01-01T12:00, 2026-04-01T12:00]; won window starts 2026-01-31T12:00.
-    report = run(touchpoints={"occurred_at": "2025-12-31T12:00:00Z"})
+    # 90-day windows: pipeline [2026-01-01T12:00, 2026-04-01T12:00]; won from 2026-01-31T12:00.
+    report = run(lookback_days=90, touchpoints={"occurred_at": "2025-12-31T12:00:00Z"})
     assert warning_codes(report) == [("touchpoints", "tp-1", W.TOUCHPOINT_OUTSIDE_LOOKBACK)]
+
+
+def test_without_a_cap_only_touches_after_every_conversion_warn():
+    # Default (no cap): an old touch is eligible; one after the win (2026-06-15) is not.
+    assert run(touchpoints={"occurred_at": "2025-12-31T12:00:00Z"}).warnings == []
+    report = run(touchpoints={"occurred_at": "2026-07-01T00:00:00Z"})
+    assert warning_codes(report) == [("touchpoints", "tp-1", W.TOUCHPOINT_OUTSIDE_LOOKBACK)]
+    assert "After every conversion" in report.warnings[0].message
 
 
 def test_touchpoint_inside_only_the_won_window_does_not_warn():
@@ -359,7 +367,7 @@ def test_report_serializes_to_plain_data():
         "duplicates": 0,
     }
     assert data["rejected"][0]["issues"][0]["code"] == "INVALID_ID"
-    assert data["lookback_days"] == 90
+    assert data["lookback_days"] is None  # no cap by default
 
 
 def test_every_code_has_a_description():

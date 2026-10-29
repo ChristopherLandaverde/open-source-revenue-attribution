@@ -1,12 +1,16 @@
 """Data types and the model interface shared by every attribution model."""
 
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_FLOOR, Decimal
+from fractions import Fraction
 from typing import Protocol
 
-DEFAULT_LOOKBACK_DAYS = 90
+# No cap by default: every touch from the first interaction up to the conversion is eligible,
+# as in Dreamdata (docs/decisions.md). A model can take a lookback in days instead.
+DEFAULT_LOOKBACK_DAYS: int | None = None
 UNATTRIBUTED = "Unattributed"
 MISSING = "(none)"
 
@@ -36,6 +40,7 @@ class Conversion:
     currency: str
     converted_at: datetime
     touchpoints: tuple[Touchpoint, ...]
+    minor_unit: int = 2  # decimal places of the currency (0 for JPY); credits round to it
 
 
 @dataclass(frozen=True)
@@ -53,27 +58,65 @@ class AttributionModel(Protocol):
     """Every model takes one conversion and returns credits that sum to its amount."""
 
     name: str
-    lookback_days: int
+    lookback_days: int | None  # None: no cap (first interaction to conversion)
+    parameters: str  # the rule in one line, shown next to the model name
+    standard: str  # which vendors define the model this way (docs/research/m4-models.md)
 
     def attribute(self, conversion: Conversion) -> list[Credit]: ...
 
 
-def window_start(conversion: Conversion, lookback_days: int) -> datetime:
-    """The earliest eligible instant: conversion time minus the lookback (inclusive)."""
+def describe_window(lookback_days: int | None) -> str:
+    """The window in words, shown next to every number."""
+    if lookback_days is None:
+        return "No lookback cap: every touch up to the conversion"
+    return f"{lookback_days}-day lookback"
+
+
+def window_start(conversion: Conversion, lookback_days: int | None) -> datetime | None:
+    """The earliest eligible instant (inclusive), or None when there is no cap."""
+    if lookback_days is None:
+        return None
     return conversion.converted_at - timedelta(days=lookback_days)
 
 
-def eligible_touchpoints(conversion: Conversion, lookback_days: int) -> list[Touchpoint]:
-    """Touchpoints inside [converted_at - lookback, converted_at], oldest first.
+def eligible_touchpoints(conversion: Conversion, lookback_days: int | None) -> list[Touchpoint]:
+    """Touchpoints at or before the conversion (and inside the lookback, if any), oldest first.
 
     Both window ends are inclusive. Ties on time are broken by touchpoint id so the
     same input always produces the same order.
     """
     start = window_start(conversion, lookback_days)
     eligible = [
-        tp for tp in conversion.touchpoints if start <= tp.occurred_at <= conversion.converted_at
+        tp
+        for tp in conversion.touchpoints
+        if (start is None or start <= tp.occurred_at) and tp.occurred_at <= conversion.converted_at
     ]
     return sorted(eligible, key=lambda tp: (tp.occurred_at, tp.id))
+
+
+def allocate(amount: Decimal, weights: Sequence, places: int) -> list[Decimal]:
+    """Split `amount` in proportion to `weights`, each share at `places` decimals, summing exactly.
+
+    Largest-remainder rounding: every exact share is rounded down to the minor unit, then the
+    leftover minor units go one each to the largest remainders, ties to the earlier position.
+    Weights may be int, Decimal, Fraction or float; they are used exactly (as Fractions).
+    """
+    exact_weights = [Fraction(w) for w in weights]
+    total_weight = sum(exact_weights, Fraction(0))
+    if total_weight <= 0 or any(w < 0 for w in exact_weights):
+        raise ValueError("allocate needs non-negative weights with a positive total")
+    unit = Fraction(1, 10**places)
+    exact = [Fraction(amount) * w / total_weight for w in exact_weights]
+    floors = [(share // unit) * unit for share in exact]
+    leftover = int((Fraction(amount) - sum(floors, Fraction(0))) / unit)
+    by_remainder = sorted(range(len(exact)), key=lambda i: (-(exact[i] - floors[i]), i))
+    for i in by_remainder[:leftover]:
+        floors[i] += unit
+    quantum = Decimal(1).scaleb(-places)
+    return [
+        (Decimal(f.numerator) / Decimal(f.denominator)).quantize(quantum, rounding=ROUND_FLOOR)
+        for f in floors
+    ]
 
 
 def unattributed(conversion: Conversion) -> list[Credit]:

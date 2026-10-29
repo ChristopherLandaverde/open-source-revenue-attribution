@@ -30,7 +30,9 @@ and the first-touch model reproduces `expected/first_touch.json` exactly.
 
 ## Validation (expected/validation.json)
 
-Rows count the header as row 1. Lookback is 90 days.
+Rows count the header as row 1. `expected/validation.json` uses the optional 90-day window
+(`validate_import(..., lookback_days=90)`). With the default (no cap), `tp-11` and `tp-15` are
+eligible for their opportunities and do not warn, so a live import shows 8 warnings, not 10.
 
 **Refused (10 rows, never loaded):**
 
@@ -64,8 +66,9 @@ Rows count the header as row 1. Lookback is 90 days.
 **Counts:** accounts 5 received / 4 accepted / 1 refused · contacts 9 / 7 / 1 (+1 duplicate)
 · opportunities 10 / 6 / 4 · touchpoints 19 / 15 / 4.
 
-## First-touch results (expected/first_touch.json)
+## First-touch results with a 90-day window (expected/first_touch.json, `lookback_90`)
 
+The default has no lookback cap; see "Default: no lookback cap" below for what changes.
 Window = `[conversion − 90 days, conversion]`, both ends inclusive, all times converted to UTC.
 Pipeline converts at `created_at`, won revenue at `won_at` ([decisions](../../docs/decisions.md)).
 Ties on time go to the lower touchpoint ID.
@@ -95,3 +98,85 @@ win `opp-106` instead: the fixture fails if timezones are mishandled.
 
 Every opportunity's credits sum to its amount (first-touch gives the whole amount to one
 touchpoint or to Unattributed), so totals reconcile with no rounding.
+
+## Model comparison with a 90-day window (expected/models.json, `lookback_90`)
+
+Same windows and eligible touches as above. Only three conversions have more than one eligible
+touch, so only they differ between models; every other opportunity gives its whole amount to
+its single touch (or to Unattributed) under every model. Leftover cents go to the largest
+remainder, ties to the earlier touch ([`allocate`](../../attribution/types.py)).
+
+| Conversion | Eligible touches, oldest first | First | Last | Linear | Position-based 40/20/40 | Time decay, 7-day half-life |
+|---|---|---|---|---|---|---|
+| opp-101 pipeline, 24,000.00 USD | tp-01 q1-search (49 d 22 h before), tp-02 abm-launch (27 d 2 h) | tp-01 | tp-02 | 12,000.00 each | two touches: 12,000.00 each | weights 2^(−49.917/7) = 0.0071346, 2^(−27.083/7) = 0.0684385 → 2,265.757… and 21,734.243… → floors 2,265.75 + 21,734.24 = 23,999.99; the cent goes to tp-01 (remainder 0.71 vs 0.29 of a cent): **2,265.76 / 21,734.24** |
+| opp-103 pipeline, 15,000.00 USD | tp-07 q1-search, tp-08 abm-launch (same instant, ID order) | tp-07 | tp-08 | 7,500.00 each | 7,500.00 each | equal ages → 7,500.00 each |
+| opp-103 won, 15,000.00 USD | tp-07, tp-08 (70 d 0.5 h before), tp-09 (none) (28 d 23 h) | tp-07 | tp-09 | 5,000.00 each | 6,000.00 / 3,000.00 / 6,000.00 | weights 0.00097455, 0.00097455, 0.05684177 → 248.648…, 248.648…, 14,502.703… → floors sum 14,999.98; 2 cents to tp-07 and tp-08 (remainder 0.83 each vs 0.34): **248.65 / 248.65 / 14,502.70** |
+
+**Influenced** counts each opportunity's full amount once for every campaign with at least one
+eligible touch, so it overlaps: pipeline USD influenced sums to 39,000 + 39,000 + 6,000
+= 84,000.00 against 54,000.00 of pipeline. opp-104 (no eligible touch) is left out of
+influence, as in Dreamdata. Every model column sums to 54,000.00.
+
+Pipeline, USD (First / Last / Linear / Position / Time decay · Influenced):
+
+- google / cpc / q1-search: 39,000.00 / 0 / 19,500.00 / 19,500.00 / 9,765.76 (2,265.76 + 7,500) · 39,000.00 (opp-101, opp-103)
+- linkedin / paid-social / abm-launch: 0 / 39,000.00 / 19,500.00 / 19,500.00 / 29,234.24 (21,734.24 + 7,500) · 39,000.00
+- newsletter / email / april-digest: 6,000.00 under every model · 6,000.00
+- Unattributed (opp-104, no contact): 9,000.00 under every model · not in Influenced
+- EUR and JPY: one touch each, so the first-touch amounts under every model.
+
+Won, USD:
+
+- partner / referral / may-webinar: 24,000.00 under every model (opp-101's only touch) · 24,000.00
+- (none) / (none) / (none): 0 / 15,000.00 / 5,000.00 / 6,000.00 / 14,502.70 · 15,000.00
+- google / cpc / q1-search: 15,000.00 / 0 / 5,000.00 / 6,000.00 / 248.65 · 15,000.00
+- linkedin / paid-social / abm-launch: 0 / 0 / 5,000.00 / 3,000.00 / 248.65 · 15,000.00
+- Each column sums to 39,000.00. EUR: (none) / (none) / (none) 18,500.50 under every model.
+
+## Default: no lookback cap (expected/first_touch.json and models.json, top level)
+
+Since M4 the journey runs from the first interaction to the conversion, as in Dreamdata
+([decisions](../../docs/decisions.md)). Touches after the conversion still never count. Three
+touches that the 90-day window excluded now count: `tp-11` (opp-105, both metrics), `tp-15`
+(opp-106 pipeline) and `tp-01`/`tp-02` (opp-101 won). Everything else is as above.
+
+**First-touch, what moved:**
+
+| Conversion | 90-day window | No cap |
+|---|---|---|
+| opp-105 pipeline, 18,500.50 EUR | tp-12 linkedin / (none) / (none) | **tp-11 google / cpc / q4-search** (2025-12-01, the earliest) |
+| opp-106 pipeline, 1,200,000 JPY | tp-14 event / trade-show / robotics-expo | **tp-15 google / cpc / q1-search-jp** (one minute earlier than tp-14) |
+| opp-101 won, 24,000.00 USD | tp-03 partner / referral / may-webinar | **tp-01 google / cpc / q1-search** |
+| opp-105 won, 18,500.50 EUR | tp-13 (none) / (none) / (none) | **tp-11 google / cpc / q4-search** |
+
+Pipeline first-touch: USD unchanged (q1-search 39,000.00, Unattributed 9,000.00, april-digest
+6,000.00); EUR q4-search 18,500.50; JPY q1-search-jp 1,200,000. Won: USD q1-search 39,000.00
+(opp-101 + opp-103); EUR q4-search 18,500.50.
+
+**Multi-touch conversions that changed** (time decay: weight 2^(−age/7 days), age back from
+the conversion; leftover minor units to the largest remainder):
+
+| Conversion | Eligible touches, oldest first | First | Last | Linear | Position-based | Time decay |
+|---|---|---|---|---|---|---|
+| opp-105 pipeline, 18,500.50 EUR | tp-11 q4-search (140 d), tp-12 linkedin (36 d) | tp-11 | tp-12 | 9,250.25 each | two touches: 9,250.25 each | weights 2^−20 = 0.00000095, 2^(−36/7) = 0.0283039 → 0.6233…, 18,499.8767… → floors 0.62 + 18,499.87 = 18,500.49; the cent to tp-12 (0.67 vs 0.33): **0.62 / 18,499.88** |
+| opp-106 pipeline, 1,200,000 JPY | tp-15 q1-search-jp (90 d 1 min), tp-14 robotics-expo (90 d) | tp-15 | tp-14 | 600,000 each | 600,000 each | weights 0.00013477 / 0.00013478 → 599,979.37…, 600,020.63… → floors 599,979 + 600,020 = 1,199,999; 1 yen to tp-14: **599,979 / 600,021** |
+| opp-101 won, 24,000.00 USD | tp-01 q1-search (124 d 22 h), tp-02 abm-launch (102 d 2 h), tp-03 may-webinar (35 d 20 h) | tp-01 | tp-03 | 8,000.00 each | 9,600.00 / 4,800.00 / 9,600.00 | weights 0.0000042467, 0.0000407361, 0.0287749 → 3.5365…, 33.9234…, 23,962.5402… → floors sum 23,999.99; the cent to tp-01 (0.65 vs 0.34 vs 0.02): **3.54 / 33.92 / 23,962.54** |
+| opp-105 won, 18,500.50 EUR | tp-11 (212 d), tp-12 (108 d), tp-13 (none) (42 d) | tp-11 | tp-13 | 18,500.50 / 3 = 6,166.833… → **6,166.84** / 6,166.83 / 6,166.83 (cent to the earliest) | 7,400.20 / 3,700.10 / 7,400.20 | weights 2^−30.29, 2^−15.43, 2^−6 → 0.0009…, 26.8084…, 18,473.6907… → floors 0.00 + 26.80 + 18,473.69 = 18,500.49; the cent to tp-12 (0.84): **0.00 / 26.81 / 18,473.69** |
+
+Per campaign (First / Last / Linear / Position / Time decay · Influenced):
+
+- Pipeline EUR: google / cpc / q4-search 18,500.50 / 0 / 9,250.25 / 9,250.25 / 0.62 · 18,500.50;
+  linkedin / (none) / (none) 0 / 18,500.50 / 9,250.25 / 9,250.25 / 18,499.88 · 18,500.50.
+- Pipeline JPY: event / trade-show / robotics-expo 0 / 1,200,000 / 600,000 / 600,000 / 600,021 ·
+  1,200,000; google / cpc / q1-search-jp 1,200,000 / 0 / 600,000 / 600,000 / 599,979 · 1,200,000.
+- Pipeline USD: as in the 90-day table above (no USD pipeline touch was outside 90 days).
+- Won USD (opp-101 + opp-103): google / cpc / q1-search 39,000.00 / 0 / 13,000.00 (8,000 + 5,000) /
+  15,600.00 (9,600 + 6,000) / 252.19 (3.54 + 248.65) · 39,000.00; linkedin / paid-social /
+  abm-launch 0 / 0 / 13,000.00 / 7,800.00 / 282.57 (33.92 + 248.65) · 39,000.00; partner /
+  referral / may-webinar 0 / 24,000.00 / 8,000.00 / 9,600.00 / 23,962.54 · 24,000.00;
+  (none) / (none) / (none) 0 / 15,000.00 / 5,000.00 / 6,000.00 / 14,502.70 · 15,000.00.
+  Each column sums to 39,000.00.
+- Won EUR: (none) / (none) / (none) 0 / 18,500.50 / 6,166.83 / 7,400.20 / 18,473.69;
+  google / cpc / q4-search 18,500.50 / 0 / 6,166.84 / 7,400.20 / 0.00; linkedin / (none) /
+  (none) 0 / 0 / 6,166.83 / 3,700.10 / 26.81. Influenced 18,500.50 each. Each column sums to
+  18,500.50.

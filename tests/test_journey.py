@@ -46,7 +46,7 @@ def summary(journey):
 
 
 def test_journey_orders_every_touch_and_explains_eligibility():
-    journey = build_journey(CONVERSION, FirstTouch())
+    journey = build_journey(CONVERSION, FirstTouch(lookback_days=90))
     E = Eligibility
     assert summary(journey) == [
         ("t-before", E.BEFORE_WINDOW, None),
@@ -63,21 +63,21 @@ def test_journey_orders_every_touch_and_explains_eligibility():
 
 
 def test_journey_credits_reconcile_to_the_amount():
-    journey = build_journey(CONVERSION, FirstTouch())
+    journey = build_journey(CONVERSION, FirstTouch(lookback_days=90))
     credited = sum(s.credit for s in journey.steps if s.credit) + journey.unattributed
     assert credited == CONVERSION.amount
 
 
 def test_journey_is_the_same_for_every_input_order():
-    expected = summary(build_journey(CONVERSION, FirstTouch()))
+    expected = summary(build_journey(CONVERSION, FirstTouch(lookback_days=90)))
     for order in itertools.permutations(TOUCHES):
         shuffled = Conversion(**{**CONVERSION.__dict__, "touchpoints": order})
-        assert summary(build_journey(shuffled, FirstTouch())) == expected
+        assert summary(build_journey(shuffled, FirstTouch(lookback_days=90))) == expected
 
 
 def test_no_eligible_touch_means_the_whole_amount_is_unattributed():
     only_late = Conversion(**{**CONVERSION.__dict__, "touchpoints": (TOUCHES[1],)})
-    journey = build_journey(only_late, FirstTouch())
+    journey = build_journey(only_late, FirstTouch(lookback_days=90))
     assert summary(journey) == [("t-after", Eligibility.AFTER_CONVERSION, None)]
     assert journey.unattributed == Decimal("1000.00")
     assert journey.credited_step is None
@@ -95,9 +95,18 @@ def test_same_id_and_time_keeps_input_order_and_credits_only_one():
     # the credit lands on exactly one step.
     twins = (t("dup", 2026, 2, 1, source="csv"), t("dup", 2026, 2, 1, source="event"))
     journey = build_journey(
-        Conversion(**{**CONVERSION.__dict__, "touchpoints": twins}), FirstTouch()
+        Conversion(**{**CONVERSION.__dict__, "touchpoints": twins}), FirstTouch(lookback_days=90)
     )
     assert [(s.touchpoint.source, s.credit) for s in journey.steps] == [
         ("csv", Decimal("1000.00")),
         ("event", Decimal("0")),
     ]
+
+
+def test_no_cap_journey_has_no_window_start():
+    # Default (no cap): t-before (2025-12-31) is eligible and earliest, so it gets the credit.
+    journey = build_journey(CONVERSION, FirstTouch())
+    assert journey.window_start is None
+    assert journey.steps[0].touchpoint.id == "t-before"
+    assert journey.steps[0].eligibility == Eligibility.ELIGIBLE
+    assert journey.steps[0].credit == Decimal("1000.00")

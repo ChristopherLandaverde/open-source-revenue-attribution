@@ -11,6 +11,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
+from attribution import describe_window
 from contracts import ImportBatch, ImportReport
 from reports.imports import run_import
 
@@ -66,7 +67,7 @@ class Command(BaseCommand):
         accepted = sum(c["accepted"] for c in counts)
         duplicates = sum(c["duplicates"] for c in counts)
         self.stdout.write(
-            f"Validated {source} ({report.lookback_days}-day lookback): {received} rows, "
+            f"Validated {source} ({describe_window(report.lookback_days)}): {received} rows, "
             f"{accepted} accepted, {len(report.rejected)} refused, {duplicates} exact "
             f"duplicates ignored, {len(report.warnings)} warnings."
         )

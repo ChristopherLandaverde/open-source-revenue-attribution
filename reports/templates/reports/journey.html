@@ -1,12 +1,12 @@
 {% extends "base.html" %}
+{% block page_class %}page page-wide{% endblock %}
 {% block title %}Journey: {{ view.opportunity.name|default:view.opportunity.external_id }} · Open Source Revenue Attribution{% endblock %}
 {% block content %}
 <p class="small"><a href="{% url 'reports:report' %}?metric={{ view.metric }}">← Back to the report</a></p>
 <h1>Journey: {{ view.opportunity.name|default:view.opportunity.external_id }}</h1>
 <p class="notice">
   Every touch of this opportunity's contact, in time order, with why it is or isn't eligible and the
-  credit the <strong>{{ view.model_name }}</strong> model gives it. This is association under a named
-  rule, not causal impact.
+  credit each named model gives it. This is association under a named rule, not causal impact.
 </p>
 
 <form class="controls" hx-get="{% url 'reports:journey' view.opportunity.external_id %}" hx-target="#results" hx-indicator="#results"
