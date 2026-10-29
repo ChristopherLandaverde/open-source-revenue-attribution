@@ -364,3 +364,17 @@ def test_report_serializes_to_plain_data():
 def test_every_code_has_a_description():
     for code in [*RejectReason, *WarningCode]:
         assert code.description
+
+
+def test_every_code_and_column_is_documented():
+    from pathlib import Path
+
+    from contracts import SCHEMAS
+
+    doc = (Path(__file__).resolve().parent.parent / "docs" / "contract.md").read_text()
+    for code in [*RejectReason, *WarningCode]:
+        assert f"| `{code}` |" in doc, f"{code} missing from docs/contract.md"
+    for entity, columns in SCHEMAS.items():
+        assert f"### {entity}.csv" in doc
+        for column in columns:
+            assert f"| `{column.name}` |" in doc, f"{entity}.{column.name} not documented"
