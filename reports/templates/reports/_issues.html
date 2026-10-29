@@ -1,8 +1,8 @@
 <section id="issues" aria-live="polite">
   {% if view.show == "rejected" %}
-    <h2>Refused rows <span class="muted">(not loaded)</span></h2>
+    <h2><span class="tag tag-refused">× Refused</span> Refused rows <span class="muted">(not loaded)</span></h2>
   {% else %}
-    <h2>Warnings <span class="muted">(loaded, worth a look)</span></h2>
+    <h2><span class="tag tag-review">! Review</span> Warnings <span class="muted">(loaded, worth a look)</span></h2>
   {% endif %}
   {% if not view.issues %}
     <p class="empty">{% if view.show == "rejected" %}No rows were refused.{% else %}No warnings.{% endif %}</p>
@@ -10,21 +10,22 @@
   <div class="table-wrap">
   <table>
     <thead><tr><th scope="col">File</th><th scope="col" class="num">Row</th><th scope="col">ID</th>
-      <th scope="col">Code</th><th scope="col">Field</th><th scope="col">Detail</th></tr></thead>
+      <th scope="col">Code</th><th scope="col">Field</th><th scope="col">What we saw</th><th scope="col">How to fix</th></tr></thead>
     <tbody>
     {% for issue in view.issues %}
       <tr>
-        <td>{{ issue.file }}</td>
+        <td class="mono">{{ issue.file }}</td>
         <td class="num">{{ issue.row }}</td>
-        <td>{{ issue.record_id|default:"—" }}</td>
+        <td class="mono">{{ issue.record_id|default:"—" }}</td>
         <td><code>{{ issue.code }}</code></td>
-        <td>{{ issue.field|default:"—" }}</td>
+        <td class="mono">{{ issue.field|default:"—" }}</td>
         <td>{{ issue.message }}</td>
+        <td>{{ issue.fix }}</td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
   </div>
-  <p class="context">Row numbers count the header as row 1.</p>
+  <p class="context small">Row numbers count the header as row 1.{% if view.show == "rejected" %} Re-import the corrected file; fixed rows leave this list.{% endif %}</p>
   {% endif %}
 </section>

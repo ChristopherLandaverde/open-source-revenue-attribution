@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}First-touch report · Open Source Revenue Attribution{% endblock %}
 {% block content %}
-<h1>Sample report: {{ report.model_name }} attribution</h1>
+<h1>{{ report.model_name }} attribution report</h1>
 <p class="notice">
   This report shows how the <strong>{{ report.model_name }}</strong> model assigns credit to
   touchpoints associated with each opportunity. It describes association under a named rule,
@@ -19,7 +19,7 @@
       </label>
     {% endfor %}
   </fieldset>
-  <noscript><button type="submit">Update</button></noscript>
+  <noscript><button class="button" type="submit">Show selected amount</button></noscript>
 </form>
 
 {% include "reports/_results.html" %}

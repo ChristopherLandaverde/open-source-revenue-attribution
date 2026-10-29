@@ -11,10 +11,20 @@ from django.views.decorators.http import require_POST
 
 from collection.models import CollectedEvent, Workspace
 from collection.services import convert_events, ingest, workspace_for_write_key
+from contracts.touchpoints import SkipReason
+from reports.fixes import FIXES
 from reports.models import Touchpoint
 
 # RudderStack HTTP API paths. Event types other than page/track/identify are accepted by the
 # endpoint so the validator can refuse them with UNSUPPORTED_EVENT_TYPE.
+DEMO_CONTACT = "con-nw-li"  # a demo-fixture contact with no opportunities, so reports don't move
+SKIP_TEXT = {
+    SkipReason.NOT_A_PAGE_VIEW: "Track and identify events are kept, but are not touchpoints.",
+    SkipReason.ANONYMOUS: "No userId on this page view. Earlier anonymous views are not linked.",
+    SkipReason.CONTACT_NOT_IMPORTED: (
+        "userId is not an imported contact_id. Import the contact; it converts then."
+    ),
+}
 SINGLE_EVENT_PATHS = ("page", "track", "identify", "screen", "group", "alias")
 
 
@@ -85,28 +95,30 @@ def collect(request, kind: str):
 
 def events(request):
     """Collected events: what was accepted, what was refused and why, what became a touchpoint."""
-    rows = CollectedEvent.objects.select_related("workspace")
+    rows = CollectedEvent.objects.all()
     accepted = rows.filter(status=CollectedEvent.Status.ACCEPTED)
     rejected = rows.filter(status=CollectedEvent.Status.REJECTED)
     conversion = convert_events()
     skipped = dict(conversion.skipped)
     touchpoint_ids = {tp.touchpoint_id for tp in conversion.touchpoints}
-    recent = list(accepted[:50])
+    recent = list(accepted.order_by("-occurred_at", "-message_id")[:50])
     for row in recent:
         in_touchpoints = row.message_id in touchpoint_ids
         row.became = "touchpoint" if in_touchpoints else skipped.get(row.message_id)
+        row.became_text = SKIP_TEXT.get(row.became, "")
         row.campaign_key = " / ".join(
             (row.normalized or {}).get(k) or "(none)"
             for k in ("utm_source", "utm_medium", "utm_campaign")
         )
     refused = list(rejected[:50])
+    for row in refused:
+        row.issue_rows = [{**i, "fix": FIXES.get(i["code"], "")} for i in row.issues]
     context = {
         "workspaces": Workspace.objects.count(),
         "accepted_count": accepted.count(),
         "rejected_count": rejected.count(),
-        "retries": sum(r.times_received - 1 for r in rows.only("times_received")),
+        "retries": sum(r.times_received - 1 for r in accepted.only("times_received")),
         "touchpoint_count": Touchpoint.objects.filter(origin=Touchpoint.Origin.EVENT).count(),
-        "skip_counts": sorted(Counter(str(r) for r in skipped.values()).items()),
         "recent": recent,
         "refused": refused,
         "demo_enabled": settings.COLLECT_DEMO_PAGE,
@@ -119,4 +131,14 @@ def demo(request):
     if not settings.COLLECT_DEMO_PAGE:
         raise Http404("The SDK demo page is off. Set COLLECT_DEMO_PAGE=true or DEBUG=true.")
     workspace = Workspace.objects.order_by("id").first()
-    return render(request, "collection/demo.html", {"workspace": workspace})
+    context = {
+        "workspace": workspace,
+        "contact_id": DEMO_CONTACT,
+        "has_utms": "utm_source" in request.GET,
+        "sdk_config": {
+            "writeKey": workspace.write_key if workspace else "",
+            "dataPlaneUrl": request.build_absolute_uri("/").rstrip("/"),
+            "contactId": DEMO_CONTACT,
+        },
+    }
+    return render(request, "collection/demo.html", context)
