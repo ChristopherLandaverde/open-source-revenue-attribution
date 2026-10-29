@@ -169,47 +169,54 @@ event must carry to be accepted. Field names are RudderStack's.
 ### From events to touchpoints
 
 `contracts/touchpoints.py` turns accepted events into touchpoints, deterministically, in three
-steps ([decision #5](decisions.md)).
+steps ([decisions #5 and #7](decisions.md)).
 
-**1. Whose page view is it?**
+**1. Whose event is it?** (page views shown; track events follow the same rules, and an
+identify belongs to its `userId`)
 
 | Page view | Contact |
 |---|---|
 | carries `userId` | That `userId`. |
-| anonymous, and an identify with the same `anonymousId` happens **at or after** it | The identify's `userId` (*stitched*; the touchpoint records the `anonymousId`). This is how the landing visit that carried the UTMs reaches the contact. |
+| anonymous, and an identify with the same `anonymousId` happens **at or after** it | The identify's `userId` (*stitched*; the touchpoint records the `anonymousId`). This is how the landing session that carried the UTMs reaches the contact. |
 | anonymous, with no identify of its `anonymousId` at or after it | Nobody (`ANONYMOUS`). |
-| anonymous, and its `anonymousId` was identified as **two or more different** contacts | Nobody (`AMBIGUOUS_IDENTITY`): a shared browser; we can't tell whose visit it was. |
+| anonymous, and its `anonymousId` was identified as **two or more different** contacts | Nobody (`AMBIGUOUS_IDENTITY`): a shared browser; we can't tell whose session it was. |
 | its contact is not an imported `contact_id` | Nobody yet (`CONTACT_NOT_IMPORTED`). It converts after the import that adds the contact. |
 
 Only identify events link an `anonymousId` to a contact, and only backwards in time.
 
-**2. Visits.** Each contact's page views (identified and stitched, across devices) are taken
-in time order, ties by `messageId`. A page view **starts a visit** when:
+**2. Sessions** (decision #7). Each contact's events (page, track and identify; identified and
+stitched) are grouped **per browser** (`anonymousId`) in time order, ties by `messageId`. An
+event less than 30 minutes after the browser's previous event stays in the session; a gap of
+**30 minutes or more** starts a new session. Nothing else splits a session: not a new
+campaign, not a new referrer, not midnight. Sessions are taken in order of their first
+event, and each records why it started:
 
 | Rule | Code |
 |---|---|
-| it is the contact's first page view | `FIRST_VISIT` |
-| more than 30 minutes passed since the contact's previous page view (exactly 30:00 is the same visit) | `INACTIVITY` |
-| it carries campaign data (`utm_source`, `utm_medium` or `utm_campaign`) different from the current visit's | `NEW_CAMPAIGN` |
-| it arrives from another site: the referrer's host differs from the page's host (a leading `www.` is ignored) and from the referrer host that opened the current visit | `NEW_REFERRER` |
+| the contact's first session | `FIRST_SESSION` |
+| 30 minutes or more since this browser's previous event | `INACTIVITY` |
+| the contact's first session from this browser (another `anonymousId`) | `NEW_DEVICE` |
 
-Track and identify events do not extend a visit. A reload keeps the same referrer, so it does
-not start a visit.
-
-**3. Touchpoints.** A page view is a touchpoint when it starts a visit, or when it carries
-campaign data inside the current visit (`CAMPAIGN_DATA`). Every other page view is internal
-navigation (`INTERNAL_NAVIGATION`): kept and shown in the journey, never credited.
+**3. One touchpoint per session.** The session's **first page view** is its touchpoint,
+credited to that view's UTMs (`context.campaign`). When it has none (no `utm_source`,
+`utm_medium` or `utm_campaign`) and its referrer is another site (the referrer's host differs
+from the page's; a leading `www.` is ignored), the touchpoint is credited to the referrer:
+source = the referrer host, medium = `referral`. Without either it stays `(none)`. The
+session's later page views (`SAME_SESSION`) are kept and shown in the journey under their
+session, never counted again. A session with no page view (only track or identify events)
+has no touchpoint.
 
 | Event | Becomes |
 |---|---|
-| `page` that passes 1–3 | One touchpoint. ID = `messageId`, time = event time, UTMs from `context.campaign` (blank stays blank), `landing_page` = page URL, `referrer` as sent, plus `stitched_from` and `visit_rule`. |
-| `page` that fails 1 or 3 | Nothing, with the reason code above. |
+| first `page` of a session | One touchpoint. ID = `messageId`, time = event time, source / medium / campaign from `context.campaign` or the referral rule above (content and term from `context.campaign`), `landing_page` = page URL, `referrer` as sent, plus `stitched_from` and the session rule (stored in `visit_rule`). |
+| later `page` of a session | Nothing (`SAME_SESSION`); listed in the journey under its session. |
+| `page` that fails step 1 | Nothing, with the reason code above. |
 | `track`, `identify` | Nothing (`NOT_A_PAGE_VIEW`). Kept for the funnel. |
 
 Touchpoints from events are stored with `origin = event` next to CSV touchpoints. They are
 recomputed from every accepted event after each collection request and each import, because a
-later identify or page view can change earlier decisions; page views that no longer qualify
-lose their touchpoint. CSV touchpoints are counted as given: the visit rules apply to events
+later identify or event can change earlier decisions; page views that no longer qualify lose
+their touchpoint. CSV touchpoints are counted as given: the session rules apply to events
 only. The hand-calculated fixture is `sample_data/events/`.
 
 ### Journeys
@@ -218,8 +225,9 @@ Each opportunity has a journey (`attribution/journey.py`, page `/opportunities/<
 every touchpoint of **the opportunity's contact** (never other contacts at the account), in
 the order `(occurred_at, touchpoint ID)`, with equal pairs kept in a fixed source order (CSV
 before event). Each touch is `eligible`, `before_window` or `after_conversion` under the rule in
-section 5, and carries the credit the named model gives it; the contact's internal-navigation
-page views are listed as not touchpoints. Credits plus Unattributed equal the amount.
+section 5, and carries the credit the named model gives it. Each touchpoint from events is a
+session: its later page views are listed under it ("page view in the session started by …"),
+with no position and no credit. Credits plus Unattributed equal the amount.
 
 ## 4. Validation report
 
@@ -329,10 +337,44 @@ Taken during M2 where the contract was silent, then decided by Christopher in
     `anonymousId` to its contact, so the landing visit that carried the UTMs reaches the
     contact. *M3 implementation choices:* only identify events link; only views at or before
     the identify; an `anonymousId` identified as more than one contact links to nobody.
-17. **Decided: only page views that start a visit, or carry campaign data, are touchpoints.**
-    Internal navigation is not. *M3 implementation choices:* visits are per contact; a new
-    visit after more than 30 minutes of inactivity, a new campaign or a new external referrer
-    host; campaign-carrying views inside a visit still count.
+17. **Decided (#7, replaces M3's visit rule): one touchpoint per session**, as in Dreamdata
+    and GA4. A session is a contact's events from one browser less than 30 minutes apart;
+    only inactivity starts a new one. Each session is credited to its first page view's
+    UTMs, or its referrer when it has none; its other page views are shown, never counted.
+    Superseded M3 behaviour: a new campaign or new external referrer started a visit, and
+    campaign-carrying page views inside a visit were counted again.
+    Sources and the edge-case choices:
+    - *Session level.* Dreamdata: "Attribution is done on session level, such that we
+      attribute value to a session that may contain several events"; events are grouped when
+      "inactivity between interactions are less than 30 minutes"
+      ([What is a session?](https://docs.dreamdata.io/article/q8lw5qwdt8-what-is-a-session));
+      attribution weight is stored per session per stage journey
+      ([attribution table](https://developer.dreamdata.io/data-warehouse/description/attribution)).
+    - *New campaign or referrer.* GA4: "Sessions aren't restarted at midnight or when new
+      campaign parameters are encountered"
+      ([Comparing metrics](https://support.google.com/analytics/answer/11986666)); values
+      arriving mid-session "are not associated with the existing session"
+      ([traffic-source dimensions](https://support.google.com/analytics/answer/11242841)).
+    - *Exactly 30:00* starts a new session. Dreamdata's definition is "less than 30 minutes"
+      apart, and decision #7 says the same. GA4 differs by one tick ("more than a 30-minute
+      period of inactivity"); we follow Dreamdata because it is the product we are compared
+      with and the docs are not silent. (M3 treated 30:00 as the same visit.)
+    - *Midnight* does not split a session (GA4, quoted above; Dreamdata is silent). Gaps are
+      measured between UTC instants.
+    - *Different devices* are separate sessions, even when they overlap in time. Dreamdata is
+      silent; GA4 scopes a session to one browser (a session is identified by
+      `user_pseudo_id` + `session_id`,
+      [About sessions](https://support.google.com/analytics/answer/9191807)). Our browser key
+      is RudderStack's `anonymousId`.
+    - *The stitched anonymous session.* Anonymous and identified events from the same browser
+      are one session, credited to the (stitched) anonymous landing view: GA4 keeps the
+      session when a user ID is set mid-session, because the session belongs to the browser.
+    - *Track and identify events keep a session alive* (both tools time out on any
+      interaction, not only page views); the credited touch is still the first page view.
+    - *Referral credit:* source = referrer host, medium = `referral`, so it falls in GA4's
+      Referral channel ("Medium is one of referral, app, or link",
+      [Default channel group](https://support.google.com/analytics/answer/9756891)). Known
+      search engines are not yet mapped to `organic`.
 18. **Decided: `sentAt` is transport metadata**, ignored when deciding whether a repeat is a
     retry.
 19. **Decided: browser events are corrected for clock skew** with

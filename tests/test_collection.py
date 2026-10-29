@@ -198,7 +198,7 @@ def test_identify_in_a_later_request_stitches_earlier_views(client, workspace, c
     post(client, "/v1/identify", identify, **auth())
     stitched = Touchpoint.objects.get(origin="event")
     assert (stitched.external_id, stitched.contact.external_id) == ("m-anon", "con-nw-ana")
-    assert (stitched.stitched_from, stitched.visit_rule) == ("anon-1", "FIRST_VISIT")
+    assert (stitched.stitched_from, stitched.visit_rule) == ("anon-1", "FIRST_SESSION")
     # A second identify of the same browser as someone else makes it ambiguous: unlinked.
     other = {**identify, "messageId": "m-id2", "userId": "con-nw-raj"}
     post(client, "/v1/identify", other, **auth())
@@ -229,9 +229,9 @@ def test_events_before_their_contact_convert_after_the_import(client, workspace)
     post(client, "/v1/batch", BATCH, **auth())
     assert not Touchpoint.objects.filter(origin="event").exists()
     call_command("load_sample_data", stdout=StringIO(), stderr=StringIO())
-    assert Touchpoint.objects.filter(origin="event").count() == 6
+    assert Touchpoint.objects.filter(origin="event").count() == 4
     call_command("load_sample_data", stdout=StringIO(), stderr=StringIO())
-    assert Touchpoint.objects.filter(origin="event").count() == 6  # idempotent
+    assert Touchpoint.objects.filter(origin="event").count() == 4  # idempotent
 
 
 def test_event_touchpoints_do_not_change_the_demo_report(client, workspace, contacts):

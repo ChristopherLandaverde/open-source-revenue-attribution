@@ -10,7 +10,7 @@ from django.db.models import Count, Prefetch
 import attribution
 from collection.services import convert_events
 from contracts import RejectReason, WarningCode
-from contracts.touchpoints import SkipReason, TouchReason
+from contracts.touchpoints import TouchReason
 from reports.fixes import FIXES
 from reports.models import ImportRun, Opportunity, Touchpoint
 
@@ -140,12 +140,11 @@ def validation_view(show: str = "rejected") -> ValidationView:
 # --- Opportunity journey (M3) ------------------------------------------------------
 
 VISIT_RULE_TEXT = {
-    TouchReason.FIRST_VISIT: "Contact's first page view, so it starts a visit.",
-    TouchReason.INACTIVITY: "More than 30 minutes after the previous page view: a new visit.",
-    TouchReason.NEW_CAMPAIGN: "Campaign differs from the current visit's: a new visit.",
-    TouchReason.NEW_REFERRER: "Arrived from another site: a new visit.",
-    TouchReason.CAMPAIGN_DATA: "Carries campaign data inside the current visit.",
-    SkipReason.INTERNAL_NAVIGATION: "Same visit, no campaign data: internal navigation.",
+    TouchReason.FIRST_SESSION: "The contact's first session; credited to its first page view.",
+    TouchReason.INACTIVITY: (
+        "30 minutes or more after this browser's previous event: a new session."
+    ),
+    TouchReason.NEW_DEVICE: "The contact's first session from this browser: a new session.",
 }
 STATUS = {
     # status: (symbol and word, tag class)
@@ -153,13 +152,13 @@ STATUS = {
     "eligible": ("□ Eligible", "tag-observed"),
     "before": ("– Before window", "tag-neutral"),
     "after": ("– After conversion", "tag-neutral"),
-    "internal": ("– Not a touchpoint", "tag-neutral"),
+    "in_session": ("– In session", "tag-neutral"),
 }
 
 
 @dataclass(frozen=True)
 class JourneyRow:
-    position: int | None  # touchpoints only
+    position: int | None  # touchpoints; in-session rows: their session touch's position
     touchpoint_id: str
     occurred_at: object
     origin: str  # "csv" | "event"
@@ -168,6 +167,9 @@ class JourneyRow:
     referrer: str
     how: str  # how it became (or did not become) a touchpoint
     stitched_from: str
+    session_id: str  # event rows: the messageId of the session's touchpoint
+    session_number: int | None  # event rows: their session, 1, 2, ... in journey order
+    session_size: int  # touchpoint rows from events: page views in the session
     status: str  # a STATUS key
     status_label: str
     status_class: str
@@ -196,7 +198,7 @@ def _window_text(status: str, journey: attribution.Journey) -> str:
         return f"Before the window opened ({journey.window_start:%Y-%m-%d %H:%M} UTC)."
     if status == "after":
         return "After the conversion time."
-    return "Not a touchpoint, so never eligible."
+    return "Counted once, as its session's touch."
 
 
 def _row(
@@ -211,6 +213,9 @@ def _row(
     how,
     status,
     journey,
+    session_id="",
+    session_number=None,
+    session_size=0,
     position=None,
     credit=None,
 ) -> JourneyRow:
@@ -225,11 +230,35 @@ def _row(
         referrer=referrer,
         how=how,
         stitched_from=stitched_from,
+        session_id=session_id,
+        session_number=session_number,
+        session_size=session_size,
         status=status,
         status_label=label,
         status_class=css,
         window_text=_window_text(status, journey),
         credit=credit,
+    )
+
+
+def _session_row(view, journey: attribution.Journey, number=None, position=None) -> JourneyRow:
+    key = attribution.Touchpoint(
+        view.touchpoint_id, view.occurred_at, view.source, view.medium, view.campaign
+    ).campaign_key
+    return _row(
+        view.touchpoint_id,
+        view.occurred_at,
+        Touchpoint.Origin.EVENT,
+        key,
+        view.landing_page,
+        view.referrer,
+        view.stitched_from,
+        how=f"Part of the session started by {view.session_id}; not counted again.",
+        status="in_session",
+        journey=journey,
+        session_id=view.session_id,
+        session_number=number,  # with `position`: the session's own row, for the label
+        position=position,
     )
 
 
@@ -283,17 +312,32 @@ def journey_view(opportunity: Opportunity, metric: str = "pipeline") -> JourneyV
     )
     journey = attribution.build_journey(conversion, model)
 
-    rows = []
+    # Later page views of each session (#7): shown under their session, never counted again.
+    in_session: dict[str, list] = {}
+    if contact:
+        for page_view in convert_events().session_views:
+            if page_view.contact_id == contact.external_id:
+                in_session.setdefault(page_view.session_id, []).append(page_view)
+
+    rows, sessions = [], 0
     for step in journey.steps:
         record = record_for[id(step.touchpoint)]
         if step.eligibility == attribution.Eligibility.ELIGIBLE:
             status = "credited" if step.credit else "eligible"
         else:
             status = "before" if step.eligibility == "before_window" else "after"
+        session = {}
         if record.origin == Touchpoint.Origin.CSV:
             how = "Imported from touchpoints.csv; counted as given."
         else:
             how = VISIT_RULE_TEXT.get(record.visit_rule, "Collected page event.")
+            sessions += 1
+            views = in_session.pop(record.external_id, [])
+            session = {
+                "session_id": record.external_id,
+                "session_number": sessions,
+                "session_size": 1 + len(views),
+            }
         rows.append(
             _row(
                 record.external_id,
@@ -308,34 +352,14 @@ def journey_view(opportunity: Opportunity, metric: str = "pipeline") -> JourneyV
                 journey=journey,
                 position=step.position,
                 credit=step.credit,
+                **session,
             )
         )
-    if contact:
-        for internal in convert_events().internal_views:
-            if internal.contact_id != contact.external_id:
-                continue
-            key = attribution.Touchpoint(
-                internal.touchpoint_id,
-                internal.occurred_at,
-                internal.source,
-                internal.medium,
-                internal.campaign,
-            ).campaign_key
-            rows.append(
-                _row(
-                    internal.touchpoint_id,
-                    internal.occurred_at,
-                    Touchpoint.Origin.EVENT,
-                    key,
-                    internal.landing_page,
-                    internal.referrer,
-                    internal.stitched_from,
-                    how=VISIT_RULE_TEXT[internal.visit_rule],
-                    status="internal",
-                    journey=journey,
-                )
-            )
-    # Same key as the journey order, and a stable sort, so touchpoint order is unchanged.
-    rows.sort(key=lambda r: (r.occurred_at, r.touchpoint_id))
+        if session:
+            rows.extend(_session_row(v, journey, sessions, step.position) for v in views)
+    # Views whose session touch is not stored yet (a sync in progress) still show, last.
+    leftovers = sorted((v for vs in in_session.values() for v in vs), key=lambda v: (
+        v.occurred_at, v.touchpoint_id))  # fmt: skip
+    rows.extend(_session_row(v, journey) for v in leftovers)
     eligible = sum(1 for s in journey.steps if s.eligibility == attribution.Eligibility.ELIGIBLE)
     return view(journey=journey, rows=rows, eligible_count=eligible)

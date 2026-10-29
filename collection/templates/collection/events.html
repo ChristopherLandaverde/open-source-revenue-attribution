@@ -21,7 +21,7 @@
     <p class="verdict"><span class="tag tag-accepted">✓ Accepted</span>
       All {{ accepted_count }} event{{ accepted_count|pluralize }} accepted.</p>
   {% endif %}
-  <p class="context">{{ touchpoint_count }} became touchpoint{{ touchpoint_count|pluralize }}: page views of imported contacts that start a visit or carry campaign data.
+  <p class="context">{{ touchpoint_count }} became touchpoint{{ touchpoint_count|pluralize }}, one per session: the first page view of each session of an imported contact (sessions end after 30 minutes without activity).
     Anonymous views count once an identify links their anonymousId.</p>
   </div>
 

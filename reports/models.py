@@ -70,7 +70,8 @@ class Touchpoint(models.Model):
     landing_page = models.CharField(max_length=500, blank=True)
     referrer = models.CharField(max_length=500, blank=True)
     # Event touchpoints only (contracts/touchpoints.py): the anonymousId when the page view was
-    # linked to the contact by a later identify, and the visit rule that made it a touchpoint.
+    # linked to the contact by a later identify, and the session rule that made it a touchpoint
+    # (a contracts.touchpoints.TouchReason; the column kept its M3 name).
     stitched_from = models.CharField(max_length=255, blank=True)
     visit_rule = models.CharField(max_length=32, blank=True)
 

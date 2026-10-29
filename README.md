@@ -16,8 +16,8 @@ a named model and lookback window.
 Attribution here is a reporting model. It shows how a stated rule assigns credit; it does not
 estimate causal impact or incrementality.
 
-**Status:** M3 (identity stitching, visits, opportunity journeys) on a work branch; M2 is on
-`main`. One model (first-touch). Milestones: [docs/project-management-plan.md](docs/project-management-plan.md).
+**Status:** M3 (identity stitching, opportunity journeys) is on `main`; session-level touchpoints (#7) on a work branch.
+One model (first-touch). Milestones: [docs/project-management-plan.md](docs/project-management-plan.md).
 
 ![First-touch attribution report on the synthetic demo data: credit by source / medium / campaign per currency, with the model and 90-day lookback window shown above the tables](docs/media/report.png)
 
@@ -85,8 +85,8 @@ The Postgres path has not been run end to end yet; tests and the steps above use
 | CSV import | `load_sample_data --path <dir>` or the **Import CSV** page: validate, load accepted rows, list refused ones. Partial by default, `--strict` / Strict checkbox refuses everything on any error. Re-import updates by ID. | Works |
 | Validation report | `/validation/`: verdict, counts per file, every refused row and warning with its code and how to fix it | Works |
 | Event collection | `POST /v1/batch`, `/v1/page`, `/v1/track`, `/v1/identify` with a per-workspace write key. Validated, deduplicated on `messageId`, raw payload and outcome stored. | Works |
-| Events to touchpoints | An identify links the browser's earlier anonymous page views to the contact. Page views that start a visit (first view, 30+ minutes idle, new campaign, new referring site) or carry UTMs become touchpoints; internal navigation does not. Browser clock skew corrected with receive time minus `sentAt`. | Works |
-| Opportunity journey | `/opportunities/<id>/journey/`: each touch of the opportunity's contact in a fixed order, its lookback status, the visit rule that admitted it, and its first-touch credit | Works |
+| Events to touchpoints | An identify links the browser's earlier anonymous page views to the contact. Each session (a browser's events less than 30 minutes apart, as in Dreamdata and GA4) is one touchpoint, credited to its first page view's UTMs or referrer; later page views in the session are not counted again. Browser clock skew corrected with receive time minus `sentAt`. | Works |
+| Opportunity journey | `/opportunities/<id>/journey/`: each touch of the opportunity's contact in a fixed order, its lookback status, the session rule that admitted it with the session's page views nested under it, and its first-touch credit | Works |
 | Attribution | First-touch, pipeline (at creation) and won revenue (at close), 90-day lookback, totals per currency | Works |
 | Demo fixtures | Synthetic CSVs and events with hand-calculated expected results ([sample_data/](sample_data/)) | Works |
 | Last-touch and linear, side by side | | Planned (M4) |
@@ -118,7 +118,7 @@ The Postgres path has not been run end to end yet; tests and the steps above use
 
 | Path | What |
 |---|---|
-| `contracts/` | Pure-Python contract: import and event validators, reason codes, clock-skew correction, event → touchpoint conversion (stitching, visits). No Django imports (a test enforces it). |
+| `contracts/` | Pure-Python contract: import and event validators, reason codes, clock-skew correction, event → touchpoint conversion (stitching, sessions). No Django imports (a test enforces it). |
 | `attribution/` | Pure-Python models, types and journeys. No Django imports. |
 | `collection/` | Django app: write-key workspaces, `/v1/` endpoint, stored events, events page, SDK demo page. |
 | `reports/` | Django app: records, imports (command and upload page), report, journey and validation pages. |

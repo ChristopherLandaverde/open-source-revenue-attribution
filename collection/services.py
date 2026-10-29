@@ -52,7 +52,7 @@ def ingest(workspace: Workspace, payloads: list[Any]) -> list[Outcome]:
     """Validate and store each payload in order; return one Outcome per payload.
 
     Touchpoints are then recomputed from every accepted event, because an identify can
-    stitch earlier page views and a new page view can change which views start a visit.
+    stitch earlier page views and a new event can change which views start a session.
     """
     outcomes = []
     for position, payload in enumerate(payloads, start=1):
@@ -178,7 +178,7 @@ def _save_touchpoints(conversion: TouchpointConversion) -> None:
                 "visit_rule": tp.visit_rule,
             },
         )
-    # Page views that no longer qualify (now internal navigation, or now ambiguous) go away.
+    # Page views that no longer qualify (now inside a session, or now ambiguous) go away.
     stale = Touchpoint.objects.filter(origin=Touchpoint.Origin.EVENT).exclude(
         external_id__in=[tp.touchpoint_id for tp in conversion.touchpoints]
     )
