@@ -75,7 +75,7 @@
           <span class="small muted mono">{{ row.opportunity.amount|minor_unit:row.opportunity.currency }} {{ row.opportunity.currency }}</span></th>
         <td class="mono">{{ row.converted_at|date:"Y-m-d H:i" }} UTC</td>
         {% for credits in row.credits %}
-        <td class="small">{% for credit in credits %}{% if credit.amount or not credit.touchpoint_id %}<span class="mono nowrap">{% if credit.touchpoint_id %}{{ credit.touchpoint_id }}{% else %}Unattributed{% endif %} {{ credit.amount|minor_unit:credit.currency }}</span><br>{% endif %}{% endfor %}</td>
+        <td class="small">{% for credit in credits %}{% if credit.amount or not credit.touchpoint_id %}<span class="mono">{% if credit.touchpoint_id %}{{ credit.touchpoint_id }}{% else %}Unattributed{% endif %} {{ credit.amount|minor_unit:credit.currency }}</span><br>{% endif %}{% endfor %}</td>
         {% endfor %}
       </tr>
     {% endfor %}
