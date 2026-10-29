@@ -4,10 +4,12 @@ import json
 from collections import Counter
 
 from django.conf import settings
-from django.http import Http404, JsonResponse
+from django.contrib.auth.decorators import login_not_required
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.utils.cache import patch_vary_headers
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_http_methods
 
 from collection.models import CollectedEvent, Workspace
 from collection.services import convert_events, ingest, workspace_for_write_key
@@ -51,6 +53,27 @@ def _write_key(request) -> str:
     return decoded.partition(":")[0]
 
 
+# What a browser may send cross-origin: the RudderStack SDK posts JSON with the write key in
+# Authorization and the base64 anonymousId in an AnonymousId header. No cookies are involved,
+# so Access-Control-Allow-Credentials is never sent.
+CORS_ALLOW_HEADERS = "Authorization, Content-Type, AnonymousId"
+CORS_MAX_AGE = "86400"
+
+
+def _origin_allowed(request, origin: str) -> bool:
+    """Same-origin pages always; other origins only when listed in COLLECT_ALLOWED_ORIGINS."""
+    if origin == request.build_absolute_uri("/").rstrip("/"):
+        return True
+    allowed = settings.COLLECT_ALLOWED_ORIGINS
+    return "*" in allowed or origin.rstrip("/") in {o.rstrip("/") for o in allowed}
+
+
+def _with_cors(response: HttpResponse, origin: str) -> HttpResponse:
+    response["Access-Control-Allow-Origin"] = origin
+    patch_vary_headers(response, ["Origin"])
+    return response
+
+
 def _error(status: int, message: str, **headers) -> JsonResponse:
     response = JsonResponse({"error": message}, status=status)
     for name, value in headers.items():
@@ -58,11 +81,38 @@ def _error(status: int, message: str, **headers) -> JsonResponse:
     return response
 
 
+@login_not_required
 @csrf_exempt
-@require_POST
+@require_http_methods(["POST", "OPTIONS"])
 def collect(request, kind: str):
+    """RudderStack HTTP API. Write-key auth; browsers on other origins need an allowlist entry.
+
+    A browser request carries an Origin header. Unless that origin is this server's own or is
+    listed in COLLECT_ALLOWED_ORIGINS, the preflight gets no CORS headers and the POST is
+    refused with 403 before anything is stored. Requests without Origin (servers, curl) are
+    authenticated by the write key alone.
+    """
     if kind != "batch" and kind not in SINGLE_EVENT_PATHS:
         raise Http404("Unknown collection endpoint.")
+    origin = request.headers.get("Origin", "")
+    if origin and not _origin_allowed(request, origin):
+        return _error(
+            403,
+            f"Origin {origin} is not allowed to send events. Add it to COLLECT_ALLOWED_ORIGINS.",
+        )
+    if request.method == "OPTIONS":
+        response = HttpResponse(status=204)
+        if origin:
+            _with_cors(response, origin)
+            response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+            response["Access-Control-Allow-Headers"] = CORS_ALLOW_HEADERS
+            response["Access-Control-Max-Age"] = CORS_MAX_AGE
+        return response
+    response = _collect(request, kind)
+    return _with_cors(response, origin) if origin else response
+
+
+def _collect(request, kind: str) -> JsonResponse:
     workspace = workspace_for_write_key(_write_key(request))
     if workspace is None:
         return _error(

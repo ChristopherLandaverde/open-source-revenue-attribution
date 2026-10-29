@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Sign in · Open Source Revenue Attribution{% endblock %}
+{% block page_class %}page page-narrow{% endblock %}
+{% block content %}
+<h1>Sign in</h1>
+<p class="context">Reports, imports and events need an account on this server.</p>
+
+<form method="post" action="{% url 'login' %}" novalidate>
+  {% csrf_token %}
+  {% if form.errors %}
+    <div class="notice notice-error" role="alert">
+      <p><strong>Username and password didn't match.</strong> Check both and try again; passwords are case-sensitive.</p>
+    </div>
+  {% endif %}
+  <div class="field">
+    <label for="{{ form.username.id_for_label }}">Username</label>
+    <input type="text" name="{{ form.username.html_name }}" id="{{ form.username.id_for_label }}"
+           value="{{ form.username.value|default:'' }}" autocomplete="username" autocapitalize="none" required autofocus
+           {% if form.errors %}aria-invalid="true"{% endif %}>
+  </div>
+  <div class="field">
+    <label for="{{ form.password.id_for_label }}">Password</label>
+    <input type="password" name="{{ form.password.html_name }}" id="{{ form.password.id_for_label }}"
+           autocomplete="current-password" required {% if form.errors %}aria-invalid="true"{% endif %}>
+  </div>
+  <input type="hidden" name="next" value="{{ next }}">
+  <div class="actions">
+    <button class="button button-primary" type="submit">Sign in</button>
+  </div>
+</form>
+<p class="context small">No account yet? The server's operator creates one with
+  <code>python manage.py createsuperuser</code> (see <code>docs/self-hosting.md</code>).</p>
+{% endblock %}

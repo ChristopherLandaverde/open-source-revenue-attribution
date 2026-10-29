@@ -15,13 +15,20 @@
   {% with current=request.resolver_match.view_name %}
   <header class="site-header">
     <span class="brand">Open Source Revenue Attribution</span>
-    <nav class="site-nav" aria-label="Main">
-      <a href="{% url 'reports:report' %}"{% if current == 'reports:report' %} aria-current="page"{% endif %}>Model comparison</a>
-      <a href="{% url 'reports:readiness' %}"{% if current == 'reports:readiness' %} aria-current="page"{% endif %}>Data readiness</a>
-      <a href="{% url 'reports:validation' %}"{% if current == 'reports:validation' %} aria-current="page"{% endif %}>Data validation</a>
-      <a href="{% url 'reports:import' %}"{% if current == 'reports:import' %} aria-current="page"{% endif %}>Import CSV</a>
-      <a href="{% url 'collection:events' %}"{% if current == 'collection:events' or current == 'collection:demo' %} aria-current="page"{% endif %}>Events</a>
-    </nav>
+    {% if user.is_authenticated %}
+      <nav class="site-nav" aria-label="Main">
+        <a href="{% url 'reports:report' %}"{% if current == 'reports:report' %} aria-current="page"{% endif %}>Model comparison</a>
+        <a href="{% url 'reports:readiness' %}"{% if current == 'reports:readiness' %} aria-current="page"{% endif %}>Data readiness</a>
+        <a href="{% url 'reports:validation' %}"{% if current == 'reports:validation' %} aria-current="page"{% endif %}>Data validation</a>
+        <a href="{% url 'reports:import' %}"{% if current == 'reports:import' %} aria-current="page"{% endif %}>Import CSV</a>
+        <a href="{% url 'collection:events' %}"{% if current == 'collection:events' or current == 'collection:demo' %} aria-current="page"{% endif %}>Events</a>
+      </nav>
+      <form class="site-account" method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <span class="context small">Signed in as <span class="mono">{{ user.get_username }}</span></span>
+        <button class="link-button small" type="submit">Sign out</button>
+      </form>
+    {% endif %}
   </header>
   {% endwith %}
   <main class="{% block page_class %}page{% endblock %}">{% block content %}{% endblock %}</main>
