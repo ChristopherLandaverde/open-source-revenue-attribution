@@ -2,6 +2,7 @@
 
 import base64
 import json
+from datetime import datetime
 from io import StringIO
 from pathlib import Path
 
@@ -15,7 +16,17 @@ from reports.services import first_touch_report
 pytestmark = pytest.mark.django_db
 ROOT = Path(__file__).resolve().parent.parent
 BATCH = json.loads((ROOT / "sample_data" / "events" / "batch.json").read_text())
+EXPECTED = json.loads(
+    (ROOT / "sample_data" / "events" / "expected" / "touchpoints.json").read_text()
+)
 KEY = "test-write-key-0123456789"
+# The fixture's hand calculation (sample_data/events/README.md) assumes this receive time.
+RECEIVED_AT = datetime.fromisoformat("2026-09-03T09:00:03+00:00")
+
+
+@pytest.fixture(autouse=True)
+def fixed_receive_time(monkeypatch):
+    monkeypatch.setattr("collection.services.timezone.now", lambda: RECEIVED_AT)
 
 
 @pytest.fixture
@@ -91,8 +102,8 @@ def test_fixture_batch_outcomes(client, workspace):
     assert response.status_code == 200
     body = response.json()
     assert (body["received"], body["accepted"], body["duplicates"], body["rejected"]) == (
-        10,
-        8,
+        16,
+        14,
         1,
         1,
     )
@@ -130,8 +141,8 @@ def test_replaying_the_same_batch_adds_nothing(client, workspace):
     post(client, "/v1/batch", BATCH, **auth())
     rows = CollectedEvent.objects.count()
     replay = post(client, "/v1/batch", BATCH, **auth()).json()
-    assert (replay["accepted"], replay["duplicates"], replay["rejected"]) == (0, 9, 1)
-    assert CollectedEvent.objects.count() == rows == 9  # 8 accepted + 1 refused payload
+    assert (replay["accepted"], replay["duplicates"], replay["rejected"]) == (0, 15, 1)
+    assert CollectedEvent.objects.count() == rows == 15  # 14 accepted + 1 refused payload
     assert CollectedEvent.objects.get(message_id="evt-09").times_received == 2
 
 
@@ -159,25 +170,68 @@ def test_corrected_resend_of_a_refused_event_is_accepted(client, workspace):
 # --- events -> touchpoints -----------------------------------------------------
 
 
-def test_identified_page_events_become_touchpoints(client, workspace, contacts):
+def test_page_events_become_touchpoints_per_the_hand_calculation(client, workspace, contacts):
     post(client, "/v1/batch", BATCH, **auth())
     created = Touchpoint.objects.filter(origin="event").order_by("occurred_at", "external_id")
-    assert [tp.external_id for tp in created] == ["evt-03", "evt-05", "evt-10", "evt-07"]
-    assert created[0].contact.external_id == "con-nw-li"
-    assert (created[0].source, created[0].medium, created[0].campaign) == (
-        "google",
-        "cpc",
-        "fall-search",
-    )
+    expected = EXPECTED["touchpoints"]
+    assert [tp.external_id for tp in created] == [t["touchpoint_id"] for t in expected]
+    assert [tp.occurred_at.isoformat() for tp in created] == [t["occurred_at"] for t in expected]
+    assert [tp.visit_rule for tp in created] == [t["visit_rule"] for t in expected]
+    first = created[0]  # evt-01: the anonymous landing view, stitched by the identify
+    assert (first.contact.external_id, first.stitched_from) == ("con-nw-li", "anon-li-1")
+    assert (first.source, first.medium, first.campaign) == ("google", "cpc", "fall-search")
+    otto = CollectedEvent.objects.get(message_id="evt-07")
+    assert otto.occurred_at.isoformat() == "2026-09-03T09:00:01+00:00"  # skew-corrected
+
+
+def test_identify_in_a_later_request_stitches_earlier_views(client, workspace, contacts):
+    anon = page_event("m-anon", userId=None)
+    post(client, "/v1/page", anon, **auth())
+    assert not Touchpoint.objects.filter(origin="event").exists()
+    identify = {
+        "type": "identify",
+        "messageId": "m-id",
+        "anonymousId": "anon-1",
+        "userId": "con-nw-ana",
+        "timestamp": "2026-09-10T10:05:00Z",
+    }
+    post(client, "/v1/identify", identify, **auth())
+    stitched = Touchpoint.objects.get(origin="event")
+    assert (stitched.external_id, stitched.contact.external_id) == ("m-anon", "con-nw-ana")
+    assert (stitched.stitched_from, stitched.visit_rule) == ("anon-1", "FIRST_VISIT")
+    # A second identify of the same browser as someone else makes it ambiguous: unlinked.
+    other = {**identify, "messageId": "m-id2", "userId": "con-nw-raj"}
+    post(client, "/v1/identify", other, **auth())
+    assert not Touchpoint.objects.filter(origin="event").exists()
+
+
+def test_browser_events_are_skew_corrected_on_receipt(client, workspace):
+    # Browser clock ~1h slow: skew = received 09:00:03 - sentAt 08:00:02 = +1:00:01.
+    event = page_event(originalTimestamp="2026-09-03T08:00:00Z", sentAt="2026-09-03T08:00:02Z")
+    body = post(client, "/v1/page", event, **auth()).json()
+    assert body["events"][0]["issues"] == []
+    stored = CollectedEvent.objects.get(message_id="m-1")
+    assert stored.occurred_at.isoformat() == "2026-09-03T09:00:01+00:00"  # 08:00:00 + 1:00:01
+    assert stored.normalized["time_source"] == "skew_corrected"
+
+
+def test_missing_sent_at_is_accepted_with_a_warning(client, workspace):
+    event = page_event()
+    del event["sentAt"]
+    body = post(client, "/v1/page", event, **auth()).json()
+    assert body["accepted"] == 1
+    assert body["events"][0]["issues"][0]["code"] == "CLOCK_SKEW_NOT_CORRECTED"
+    stored = CollectedEvent.objects.get(message_id="m-1")
+    assert stored.occurred_at.isoformat() == "2026-09-10T10:00:00+00:00"  # browser clock
 
 
 def test_events_before_their_contact_convert_after_the_import(client, workspace):
     post(client, "/v1/batch", BATCH, **auth())
     assert not Touchpoint.objects.filter(origin="event").exists()
     call_command("load_sample_data", stdout=StringIO(), stderr=StringIO())
-    assert Touchpoint.objects.filter(origin="event").count() == 4
+    assert Touchpoint.objects.filter(origin="event").count() == 6
     call_command("load_sample_data", stdout=StringIO(), stderr=StringIO())
-    assert Touchpoint.objects.filter(origin="event").count() == 4  # idempotent
+    assert Touchpoint.objects.filter(origin="event").count() == 6  # idempotent
 
 
 def test_event_touchpoints_do_not_change_the_demo_report(client, workspace, contacts):

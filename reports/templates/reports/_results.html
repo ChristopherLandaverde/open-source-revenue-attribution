@@ -28,13 +28,13 @@
   <h2>Credit by opportunity</h2>
   <div class="table-wrap">
   <table>
-    <thead><tr><th scope="col">Opportunity</th><th scope="col">Account</th><th scope="col">Conversion time</th>
+    <thead><tr><th scope="col">Opportunity <span class="muted">(open journey)</span></th><th scope="col">Account</th><th scope="col">Conversion time</th>
       <th scope="col">Credited touchpoint</th><th scope="col">Source / medium / campaign</th>
       <th scope="col" class="num">Credited amount</th></tr></thead>
     <tbody>
     {% for row in report.opportunity_rows %}
       <tr>
-        <td>{{ row.opportunity.name|default:row.opportunity.external_id }}</td>
+        <td><a href="{% url 'reports:journey' row.opportunity.external_id %}?metric={{ report.metric }}">{{ row.opportunity.name|default:row.opportunity.external_id }}</a></td>
         <td>{{ row.opportunity.account.name|default:row.opportunity.account.external_id }}</td>
         <td class="mono">{{ row.converted_at|date:"Y-m-d H:i" }} UTC</td>
         <td class="mono">{{ row.credit.touchpoint_id|default:"None eligible" }}</td>

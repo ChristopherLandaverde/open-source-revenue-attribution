@@ -2,6 +2,7 @@
 
 import base64
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,12 @@ pytestmark = pytest.mark.django_db
 BATCH = (
     Path(__file__).resolve().parent.parent / "sample_data" / "events" / "batch.json"
 ).read_text()
+
+
+@pytest.fixture(autouse=True)
+def fixed_receive_time(monkeypatch):
+    received = datetime.fromisoformat("2026-09-03T09:00:03+00:00")  # the fixture's receive time
+    monkeypatch.setattr("collection.services.timezone.now", lambda: received)
 
 
 @pytest.fixture
@@ -36,11 +43,14 @@ def test_events_page_shows_outcomes(client, workspace):
     client.post("/import/", {"action": "demo"})
     send(client)
     html = client.get("/events/").content.decode()
-    assert "1 event payload refused. 8 events accepted." in html
-    assert "4 became touchpoints" in html
+    assert "1 event payload refused. 14 events accepted." in html
+    assert "6 became touchpoints" in html
     assert "TIMESTAMP_WITHOUT_TIMEZONE" in html
     assert "Add the UTC offset" in html  # the fix
-    assert "Earlier anonymous views are not linked" in html
+    assert "linked to con-nw-li" in html  # evt-01, stitched by identify
+    assert "Same visit and no campaign data: internal navigation." in html  # evt-05
+    assert "identified as more than one contact" in html  # evt-14
+    assert "skew-corrected" in html and "browser clock" in html  # evt-07, evt-12
 
 
 def test_demo_page_is_off_without_debug(client, settings, workspace):
@@ -69,7 +79,7 @@ def test_demo_page_without_workspace_explains(client, settings):
 
 def test_retry_count_covers_accepted_events_only(client, workspace):
     send(client)
-    send(client)  # replay: 8 accepted retries + 1 refused repeat
+    send(client)  # replay: 14 accepted retries + 1 refused repeat
     html = client.get("/events/").content.decode()
-    # first batch: evt-03 retried once; replay: all 8 accepted again (evt-03 twice) -> 1 + 9 = 10
-    assert 'Accepted retries counted once</span><span class="value">10</span>' in html
+    # first batch: evt-03 retried once; replay: all 14 accepted again (evt-03 twice) -> 1 + 15
+    assert 'Accepted retries counted once</span><span class="value">16</span>' in html

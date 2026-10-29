@@ -21,7 +21,8 @@
     <p class="verdict"><span class="tag tag-accepted">✓ Accepted</span>
       All {{ accepted_count }} event{{ accepted_count|pluralize }} accepted.</p>
   {% endif %}
-  <p class="context">{{ touchpoint_count }} became touchpoint{{ touchpoint_count|pluralize }}: identified page views of imported contacts.</p>
+  <p class="context">{{ touchpoint_count }} became touchpoint{{ touchpoint_count|pluralize }}: page views of imported contacts that start a visit or carry campaign data.
+    Anonymous views count once an identify links their anonymousId.</p>
   </div>
 
   <ul class="stats" aria-label="Event counts">
@@ -61,10 +62,10 @@
     <tbody>
     {% for row in recent %}
       <tr>
-        <td class="mono">{{ row.occurred_at|date:"Y-m-d H:i:s" }}</td>
+        <td class="mono">{{ row.occurred_at|date:"Y-m-d H:i:s" }}<br><span class="small muted">{{ row.time_text }}</span></td>
         <td class="mono">{{ row.type }}{% if row.normalized.event_name %}: {{ row.normalized.event_name }}{% endif %}</td>
         <td class="mono">{{ row.message_id }}</td>
-        <td class="mono">{{ row.user_id|default:"(anonymous)" }}</td>
+        <td class="mono">{{ row.user_id|default:"(anonymous)" }}{% if row.stitched_to %}<br><span class="small muted">linked to {{ row.stitched_to }}</span>{% endif %}</td>
         <td class="mono">{% if row.type == "identify" %}—{% else %}{{ row.campaign_key }}{% endif %}</td>
         <td>{% if row.became == "touchpoint" %}<span class="tag tag-accepted">✓ Created</span>{% else %}<span class="tag tag-neutral">– Not a touchpoint</span> <span class="small">{{ row.became_text }}</span>{% endif %}</td>
       </tr>
@@ -72,8 +73,8 @@
     </tbody>
   </table>
   </div>
-  <p class="context small">Event time is RudderStack <code>timestamp</code>, or <code>originalTimestamp</code> (the browser clock) when absent.
-    Campaign values come only from <code>context.campaign</code>.</p>
+  <p class="context small">Event time is RudderStack <code>timestamp</code> when sent. Otherwise it is the browser clock corrected by receive time minus <code>sentAt</code>.
+    Without <code>sentAt</code>, the browser clock is used and flagged. Campaign values come only from <code>context.campaign</code>.</p>
 {% endif %}
 
 <h2>Send events</h2>
