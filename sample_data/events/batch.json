@@ -278,6 +278,144 @@
       "originalTimestamp": "2026-09-02T08:20:00.000Z",
       "timestamp": "2026-09-02T08:20:00.000Z",
       "sentAt": "2026-09-02T08:20:00.500Z"
+    },
+    {
+      "type": "page",
+      "messageId": "evt-11",
+      "anonymousId": "anon-otto-1",
+      "userId": "con-ke-otto",
+      "channel": "web",
+      "name": "Blog part 2",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "page": {
+          "url": "https://www.acme.example/blog/audit-trails/part-2",
+          "path": "/blog/audit-trails/part-2",
+          "referrer": "https://www.acme.example/blog/audit-trails",
+          "title": "Blog part 2"
+        },
+        "campaign": {}
+      },
+      "properties": {},
+      "originalTimestamp": "2026-09-03T07:00:30.000Z",
+      "sentAt": "2026-09-03T07:00:31.000Z"
+    },
+    {
+      "type": "page",
+      "messageId": "evt-12",
+      "anonymousId": "anon-otto-1",
+      "userId": "con-ke-otto",
+      "channel": "web",
+      "name": "Security",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "page": {
+          "url": "https://www.acme.example/security",
+          "path": "/security",
+          "referrer": "https://duckduckgo.com/",
+          "title": "Security"
+        },
+        "campaign": {}
+      },
+      "properties": {},
+      "originalTimestamp": "2026-09-03T09:10:00.000Z"
+    },
+    {
+      "type": "page",
+      "messageId": "evt-13",
+      "anonymousId": "anon-li-1",
+      "userId": "con-nw-li",
+      "channel": "web",
+      "name": "Pricing",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "page": {
+          "url": "https://www.acme.example/pricing",
+          "path": "/pricing",
+          "referrer": "",
+          "title": "Pricing"
+        },
+        "campaign": {}
+      },
+      "properties": {},
+      "originalTimestamp": "2026-09-02T09:00:00.000Z",
+      "timestamp": "2026-09-02T09:00:00.000Z",
+      "sentAt": "2026-09-02T09:00:01.000Z"
+    },
+    {
+      "type": "page",
+      "messageId": "evt-14",
+      "anonymousId": "anon-shared",
+      "channel": "web",
+      "name": "Home",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "page": {
+          "url": "https://www.acme.example/?utm_source=bing&utm_medium=cpc&utm_campaign=fall-brand",
+          "path": "/",
+          "referrer": "https://www.bing.com/",
+          "title": "Home"
+        },
+        "campaign": {
+          "source": "bing",
+          "medium": "cpc",
+          "name": "fall-brand"
+        }
+      },
+      "properties": {},
+      "originalTimestamp": "2026-09-04T08:00:00.000Z",
+      "timestamp": "2026-09-04T08:00:00.000Z",
+      "sentAt": "2026-09-04T08:00:01.000Z"
+    },
+    {
+      "type": "identify",
+      "messageId": "evt-15",
+      "anonymousId": "anon-shared",
+      "userId": "con-nw-ana",
+      "channel": "web",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "traits": {
+          "email": "ana@northwind.example"
+        }
+      },
+      "originalTimestamp": "2026-09-04T08:05:00.000Z",
+      "timestamp": "2026-09-04T08:05:00.000Z",
+      "sentAt": "2026-09-04T08:05:01.000Z"
+    },
+    {
+      "type": "identify",
+      "messageId": "evt-16",
+      "anonymousId": "anon-shared",
+      "userId": "con-nw-raj",
+      "channel": "web",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "traits": {
+          "email": "raj@northwind.example"
+        }
+      },
+      "originalTimestamp": "2026-09-04T08:30:00.000Z",
+      "timestamp": "2026-09-04T08:30:00.000Z",
+      "sentAt": "2026-09-04T08:30:01.000Z"
     }
   ]
 }
