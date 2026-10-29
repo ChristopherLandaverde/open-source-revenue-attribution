@@ -289,6 +289,15 @@ With `--strict` any refusal refuses the whole import and nothing is loaded.
   Lookback defaults to 90 days (`ATTRIBUTION_LOOKBACK_DAYS`).
 - Same-instant touchpoints are ordered by touchpoint ID.
 - No eligible touchpoints → the whole amount goes to `Unattributed`.
+- **Models (M4):** first-touch, last-touch, linear, position-based (U-shaped, 40/20/40) and
+  time decay (7-day half-life), defined in `attribution/models.py`. Every model sees the
+  same eligible touches, oldest first. Each model splits the amount at the currency's
+  minor unit (0 for JPY and KRW, 2 otherwise). Leftover minor units go to the largest
+  remainders, ties to the earlier touch (`attribution.types.allocate`). Credits always sum
+  to the amount.
+- **Influenced (M4):** a campaign's influenced amount is the full amount of each opportunity
+  with at least one eligible touch from it. It overlaps across campaigns and is never summed.
+- Sources and deviations: [research](research/m4-models.md), [decisions](decisions.md).
 
 ## Assumptions
 
