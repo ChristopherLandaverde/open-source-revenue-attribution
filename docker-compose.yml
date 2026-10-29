@@ -1,0 +1,20 @@
+# Local development database only. Credentials match .env.example and are not secrets.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: osra
+      POSTGRES_USER: osra
+      POSTGRES_PASSWORD: osra
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U osra -d osra"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  pgdata:
