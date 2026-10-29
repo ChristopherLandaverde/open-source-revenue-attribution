@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Data validation · Open Source Revenue Attribution{% endblock %}
+{% block content %}
+<h1>Data validation</h1>
+{% with run=view.run %}
+{% if not run %}
+  <p class="empty">No import has been validated yet. Load the sample data with
+    <code>uv run python manage.py load_sample_data</code>.</p>
+{% else %}
+  <p class="context">
+    Last import: <strong>{{ run.source }}</strong> ·
+    {{ run.created_at|date:"Y-m-d H:i" }} UTC ·
+    {{ run.lookback_days }}-day lookback{% if run.strict %} · strict mode{% endif %}
+  </p>
+  {% if run.loaded %}
+    <p class="notice">Only accepted rows were loaded. Refused rows are listed below with the reason
+      they failed the import contract (<code>docs/contract.md</code>); fix them in the CSV and re-run the import.</p>
+  {% else %}
+    <p class="notice notice-error">Nothing from this import was loaded: strict mode refuses the
+      whole import when any row fails validation. The reports still show the previous data.</p>
+  {% endif %}
+
+  {% if run.report.file_errors %}
+  <h2>File errors</h2>
+  <ul class="file-errors">
+    {% for issue in run.report.file_errors %}
+      <li><code>{{ issue.file }}</code>: <code>{{ issue.code }}</code>{% if issue.field %} ({{ issue.field }}){% endif %} — {{ issue.message }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <h2>Rows by file</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th scope="col">File</th><th scope="col" class="num">Rows received</th>
+      <th scope="col" class="num">Accepted</th><th scope="col" class="num">Refused</th>
+      <th scope="col" class="num">Exact duplicates ignored</th><th scope="col" class="num">Warnings</th></tr></thead>
+    <tbody>
+    {% for row in view.file_rows %}
+      <tr><th scope="row">{{ row.file }}</th><td class="num">{{ row.received }}</td><td class="num">{{ row.accepted }}</td><td class="num">{{ row.rejected }}</td><td class="num">{{ row.duplicates }}</td><td class="num">{{ row.warnings }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <form class="controls" hx-get="{% url 'reports:validation' %}" hx-target="#issues" hx-swap="outerHTML"
+        hx-trigger="change" hx-push-url="true">
+    <fieldset>
+      <legend>Show</legend>
+      {% for value, label in issue_views.items %}
+        <label>
+          <input type="radio" name="show" value="{{ value }}" {% if value == view.show %}checked{% endif %}>
+          {{ label }}
+        </label>
+      {% endfor %}
+    </fieldset>
+    <noscript><button type="submit">Update</button></noscript>
+  </form>
+
+  {% include "reports/_issues.html" %}
+
+  {% if view.codes %}
+  <h2>What the codes mean</h2>
+  <dl class="codes">
+    {% for code, description in view.codes %}
+      <dt><code>{{ code }}</code></dt><dd>{{ description }}</dd>
+    {% endfor %}
+  </dl>
+  {% endif %}
+{% endif %}
+{% endwith %}
+{% endblock %}

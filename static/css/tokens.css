@@ -7,6 +7,8 @@
   --color-accent: #1f5fbf;
   --color-notice-bg: #fff7e0;
   --color-notice-border: #e3c35a;
+  --color-error-bg: #fdecec;
+  --color-error-border: #d9534f;
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
   --space-1: 0.25rem;

@@ -38,6 +38,7 @@ def test_report_page_renders_with_model_and_window(client, sample):
     assert "google / cpc / q1-search" in html
     assert "not causal impact" in html
     assert 'hx-get="/"' in html
+    assert 'href="/validation/"' in html
 
 
 def test_htmx_request_returns_fragment_only(client, sample):
