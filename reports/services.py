@@ -32,6 +32,7 @@ class Report:
 
 
 def to_conversion(opportunity: Opportunity, metric: str) -> attribution.Conversion:
+    # Pipeline is measured from creation, won revenue from the win (docs/decisions.md).
     converted_at = opportunity.won_at if metric == "won" else opportunity.created_at
     return attribution.Conversion(
         opportunity_id=opportunity.external_id,
