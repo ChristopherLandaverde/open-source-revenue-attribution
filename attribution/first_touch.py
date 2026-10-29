@@ -15,6 +15,7 @@ from attribution.types import (
 class FirstTouch:
     lookback_days: int = DEFAULT_LOOKBACK_DAYS
     name: str = "First-touch"
+    parameters: str = "100% to the earliest eligible touch"
 
     def attribute(self, conversion: Conversion) -> list[Credit]:
         eligible = eligible_touchpoints(conversion, self.lookback_days)

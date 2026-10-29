@@ -1,9 +1,11 @@
 """Data types and the model interface shared by every attribution model."""
 
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_FLOOR, Decimal
+from fractions import Fraction
 from typing import Protocol
 
 DEFAULT_LOOKBACK_DAYS = 90
@@ -36,6 +38,7 @@ class Conversion:
     currency: str
     converted_at: datetime
     touchpoints: tuple[Touchpoint, ...]
+    minor_unit: int = 2  # decimal places of the currency (0 for JPY); credits round to it
 
 
 @dataclass(frozen=True)
@@ -54,6 +57,7 @@ class AttributionModel(Protocol):
 
     name: str
     lookback_days: int
+    parameters: str  # the rule in one line, shown next to the model name
 
     def attribute(self, conversion: Conversion) -> list[Credit]: ...
 
@@ -74,6 +78,31 @@ def eligible_touchpoints(conversion: Conversion, lookback_days: int) -> list[Tou
         tp for tp in conversion.touchpoints if start <= tp.occurred_at <= conversion.converted_at
     ]
     return sorted(eligible, key=lambda tp: (tp.occurred_at, tp.id))
+
+
+def allocate(amount: Decimal, weights: Sequence, places: int) -> list[Decimal]:
+    """Split `amount` in proportion to `weights`, each share at `places` decimals, summing exactly.
+
+    Largest-remainder rounding: every exact share is rounded down to the minor unit, then the
+    leftover minor units go one each to the largest remainders, ties to the earlier position.
+    Weights may be int, Decimal, Fraction or float; they are used exactly (as Fractions).
+    """
+    exact_weights = [Fraction(w) for w in weights]
+    total_weight = sum(exact_weights, Fraction(0))
+    if total_weight <= 0 or any(w < 0 for w in exact_weights):
+        raise ValueError("allocate needs non-negative weights with a positive total")
+    unit = Fraction(1, 10**places)
+    exact = [Fraction(amount) * w / total_weight for w in exact_weights]
+    floors = [(share // unit) * unit for share in exact]
+    leftover = int((Fraction(amount) - sum(floors, Fraction(0))) / unit)
+    by_remainder = sorted(range(len(exact)), key=lambda i: (-(exact[i] - floors[i]), i))
+    for i in by_remainder[:leftover]:
+        floors[i] += unit
+    quantum = Decimal(1).scaleb(-places)
+    return [
+        (Decimal(f.numerator) / Decimal(f.denominator)).quantize(quantum, rounding=ROUND_FLOOR)
+        for f in floors
+    ]
 
 
 def unattributed(conversion: Conversion) -> list[Credit]:
