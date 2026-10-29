@@ -128,10 +128,14 @@ def test_page_url_from_properties_is_accepted():
 
 
 def test_falls_back_to_original_timestamp():
+    # No `timestamp` and no sentAt: the browser clock is used as is, with a warning (M3).
     event = page()
     del event["timestamp"]
-    [accepted] = validate_events([event]).accepted
+    report = validate_events([event])
+    [accepted] = report.accepted
     assert accepted.occurred_at == datetime(2026, 3, 1, 9, 59, 58, tzinfo=UTC)
+    assert accepted.time_source == "original_timestamp"
+    assert [w.code for w in report.warnings] == [W.CLOCK_SKEW_NOT_CORRECTED]
 
 
 @pytest.mark.parametrize(
@@ -213,3 +217,86 @@ def test_text_limits_apply_to_events():
         ("msg-1", R.VALUE_TOO_LONG, "page.url"),
         ("msg-2", R.VALUE_TOO_LONG, "utm_source"),
     ]
+
+
+# --- M3: clock-skew correction (decision #5, assumption 19) ----------------------
+
+RECEIVED = datetime(2026, 3, 1, 10, 0, 1, tzinfo=UTC)
+
+
+def browser_page(**overrides):
+    """A page view as the browser SDK sends it: originalTimestamp + sentAt, no `timestamp`."""
+    event = page(originalTimestamp="2026-03-01T07:59:58.000Z", sentAt="2026-03-01T07:59:59.000Z")
+    del event["timestamp"]
+    event.update(overrides)
+    return event
+
+
+def test_skew_is_corrected_with_received_at_minus_sent_at():
+    # Hand calculation (RudderStack's rule): the browser clock runs 2h00m02s slow.
+    #   skew      = receivedAt 10:00:01 - sentAt 07:59:59         = +2:00:02
+    #   event time = originalTimestamp 07:59:58 + skew             = 10:00:00
+    report = validate_events([browser_page()], received_at=RECEIVED)
+    [event] = report.accepted
+    assert event.occurred_at == datetime(2026, 3, 1, 10, 0, 0, tzinfo=UTC)
+    assert event.time_source == "skew_corrected"
+    assert event.original_timestamp == "2026-03-01T07:59:58.000Z"  # still preserved
+    assert event.sent_at == "2026-03-01T07:59:59.000Z"
+    assert report.warnings == []
+
+
+def test_skew_correction_handles_a_fast_clock_and_offsets():
+    # Browser clock 30 minutes fast, in +02:00: original 12:30:00+02:00 = 10:30:00Z,
+    # sentAt 12:30:05+02:00 = 10:30:05Z, received 10:00:06Z -> skew -0:29:59 -> 10:00:01Z.
+    event = browser_page(
+        originalTimestamp="2026-03-01T12:30:00+02:00", sentAt="2026-03-01T12:30:05+02:00"
+    )
+    received = datetime(2026, 3, 1, 10, 0, 6, tzinfo=UTC)
+    [accepted] = validate_events([event], received_at=received).accepted
+    assert accepted.occurred_at == datetime(2026, 3, 1, 10, 0, 1, tzinfo=UTC)
+
+
+def test_server_timestamp_is_used_as_is():
+    # `timestamp` was already corrected by a RudderStack server; it is not corrected twice.
+    event = page(sentAt="2026-03-01T07:59:59Z")
+    [accepted] = validate_events([event], received_at=RECEIVED).accepted
+    assert accepted.occurred_at == datetime(2026, 3, 1, 10, tzinfo=UTC)
+    assert accepted.time_source == "timestamp"
+
+
+@pytest.mark.parametrize(
+    ("overrides", "received_at", "why"),
+    [
+        ({"sentAt": None}, RECEIVED, "no sentAt"),
+        ({"sentAt": "2026-03-01T07:59:59"}, RECEIVED, "sentAt has no UTC offset"),
+        ({"sentAt": "later"}, RECEIVED, "sentAt is not ISO 8601"),
+        ({}, None, "no receive time"),
+    ],
+)
+def test_uncorrectable_skew_falls_back_with_a_warning(overrides, received_at, why):
+    event = browser_page()
+    for key, value in overrides.items():
+        if value is None:
+            del event[key]
+        else:
+            event[key] = value
+    report = validate_events([event], received_at=received_at)
+    [accepted] = report.accepted  # never refused: sentAt is transport metadata
+    assert accepted.occurred_at == datetime(2026, 3, 1, 7, 59, 58, tzinfo=UTC)
+    assert accepted.time_source == "original_timestamp"
+    [warning] = report.warnings
+    assert (warning.code, warning.field) == (W.CLOCK_SKEW_NOT_CORRECTED, "sentAt")
+    assert why in warning.message
+
+
+def test_retry_keeps_the_first_deliverys_corrected_time():
+    # A retry differs only in sentAt, so it is a duplicate; the first accepted event stands.
+    first = browser_page()
+    already = {"msg-1": content_fingerprint(first)}
+    retry = validate_events(
+        [browser_page(sentAt="2026-03-01T08:05:00Z")],
+        already_accepted=already,
+        received_at=RECEIVED,
+    )
+    assert retry.accepted == []
+    assert [w.code for w in retry.warnings] == [W.DUPLICATE_ROW]
