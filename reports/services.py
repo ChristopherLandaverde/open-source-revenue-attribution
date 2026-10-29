@@ -4,10 +4,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from django.conf import settings
+from django.db.models import Prefetch
 
 import attribution
 from contracts import RejectReason, WarningCode
-from reports.models import ImportRun, Opportunity
+from reports.fixes import FIXES
+from reports.models import ImportRun, Opportunity, Touchpoint
 
 METRICS = {
     "pipeline": "Pipeline (credited at opportunity creation)",
@@ -58,8 +60,10 @@ def first_touch_report(metric: str = "pipeline") -> Report:
     if metric not in METRICS:
         raise ValueError(f"Unknown metric: {metric}")
     model = attribution.FirstTouch(lookback_days=settings.ATTRIBUTION_LOOKBACK_DAYS)
+    # Touchpoints from CSV and from events can share an ID; a fixed order keeps ties stable.
+    touchpoints = Touchpoint.objects.order_by("occurred_at", "external_id", "origin")
     opportunities = Opportunity.objects.select_related("account", "contact").prefetch_related(
-        "contact__touchpoints"
+        Prefetch("contact__touchpoints", queryset=touchpoints)
     )
     if metric == "won":
         opportunities = opportunities.filter(stage=Opportunity.Stage.WON)
@@ -88,7 +92,8 @@ class ValidationView:
     show: str
     file_rows: list[dict]
     issues: list[dict]
-    codes: list[tuple[str, str]]  # (code, description) for every code in this report
+    codes: list[tuple[str, str, str]]  # (code, meaning, how to fix) for every code present
+    totals: dict[str, int]
 
 
 def validation_view(show: str = "rejected") -> ValidationView:
@@ -97,7 +102,7 @@ def validation_view(show: str = "rejected") -> ValidationView:
         raise ValueError(f"Unknown issue view: {show}")
     run = ImportRun.objects.first()
     if run is None:
-        return ValidationView(None, show, [], [], [])
+        return ValidationView(None, show, [], [], [], {})
     report = run.report
     rejected = [issue for row in report["rejected"] for issue in row["issues"]]
     warnings = report["warnings"]
@@ -112,10 +117,18 @@ def validation_view(show: str = "rejected") -> ValidationView:
         )
     descriptions = {str(code): code.description for code in [*RejectReason, *WarningCode]}
     present = {i["code"] for i in [*rejected, *warnings, *report["file_errors"]]}
+    issues = rejected if show == "rejected" else warnings
+    totals = {
+        "accepted": sum(c["accepted"] for c in report["counts"].values()),
+        "refused_rows": len(report["rejected"]),
+        "file_errors": len(report["file_errors"]),
+        "warnings": len(warnings),
+    }
     return ValidationView(
         run=run,
         show=show,
         file_rows=file_rows,
-        issues=rejected if show == "rejected" else warnings,
-        codes=[(code, descriptions[code]) for code in sorted(present)],
+        issues=[{**i, "fix": FIXES[i["code"]]} for i in issues],
+        codes=[(code, descriptions[code], FIXES[code]) for code in sorted(present)],
+        totals=totals,
     )

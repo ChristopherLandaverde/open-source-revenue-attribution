@@ -2,31 +2,52 @@
 {% block title %}Data validation · Open Source Revenue Attribution{% endblock %}
 {% block content %}
 <h1>Data validation</h1>
-{% with run=view.run %}
+{% with run=view.run t=view.totals %}
 {% if not run %}
-  <p class="empty">No import has been validated yet. Load the sample data with
-    <code>uv run python manage.py load_sample_data</code>.</p>
+  <div class="empty">
+    <p><strong>No import has been validated yet.</strong></p>
+    <p>Import the four CSVs on the <a href="{% url 'reports:import' %}">Import CSV</a> page, or run
+      <code>uv run python manage.py load_sample_data</code>.</p>
+  </div>
 {% else %}
-  <p class="context">
-    Last import: <strong>{{ run.source }}</strong> ·
-    {{ run.created_at|date:"Y-m-d H:i" }} UTC ·
-    {{ run.lookback_days }}-day lookback{% if run.strict %} · strict mode{% endif %}
-  </p>
-  {% if run.loaded %}
-    <p class="notice">Only accepted rows were loaded. Refused rows are listed below with the reason
-      they failed the import contract (<code>docs/contract.md</code>); fix them in the CSV and re-run the import.</p>
-  {% else %}
-    <p class="notice notice-error">Nothing from this import was loaded: strict mode refuses the
+  <div aria-live="polite">
+  {% if not run.loaded %}
+    <p class="verdict"><span class="tag tag-refused">× Refused</span>
+      Nothing was loaded: strict mode refused the import because {{ t.refused_rows|add:t.file_errors }} row{{ t.refused_rows|add:t.file_errors|pluralize }} or file{{ t.refused_rows|add:t.file_errors|pluralize }} failed.</p>
+    <p class="notice notice-error"><strong>Nothing from this import was loaded.</strong> Strict mode refuses the
       whole import when any row fails validation. The reports still show the previous data.</p>
+  {% elif t.refused_rows or t.file_errors %}
+    <p class="verdict"><span class="tag tag-refused">× Refused</span>
+      {{ t.refused_rows }} row{{ t.refused_rows|pluralize }} refused{% if t.file_errors %}, {{ t.file_errors }} file error{{ t.file_errors|pluralize }}{% endif %}. The other {{ t.accepted }} rows were loaded.</p>
+    <p class="context">Refused rows are not in any report. Fix them in the CSV and import again.</p>
+  {% else %}
+    <p class="verdict"><span class="tag tag-accepted">✓ Accepted</span>
+      All {{ t.accepted }} rows were accepted and loaded.</p>
   {% endif %}
+  {% if run.loaded and t.warnings %}
+    <p class="context"><span class="tag tag-review">! Review</span> {{ t.warnings }} warning{{ t.warnings|pluralize }}: loaded, but worth a look.</p>
+  {% endif %}
+  </div>
+
+  <p class="context small">
+    Last import: <span class="mono">{{ run.source }}</span> ·
+    <span class="mono">{{ run.created_at|date:"Y-m-d H:i" }} UTC</span> ·
+    {{ run.lookback_days }}-day lookback{% if run.strict %} · strict mode{% endif %} ·
+    rules in <code>docs/contract.md</code>
+  </p>
 
   {% if run.report.file_errors %}
   <h2>File errors</h2>
-  <ul class="file-errors">
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th scope="col">File</th><th scope="col">Code</th><th scope="col">Detail</th><th scope="col">How to fix</th></tr></thead>
+    <tbody>
     {% for issue in run.report.file_errors %}
-      <li><code>{{ issue.file }}</code>: <code>{{ issue.code }}</code>{% if issue.field %} ({{ issue.field }}){% endif %} — {{ issue.message }}</li>
+      <tr><td><code>{{ issue.file }}</code></td><td><code>{{ issue.code }}</code></td><td>{{ issue.message }}</td><td>{% for code, meaning, fix in view.codes %}{% if code == issue.code %}{{ fix }}{% endif %}{% endfor %}</td></tr>
     {% endfor %}
-  </ul>
+    </tbody>
+  </table>
+  </div>
   {% endif %}
 
   <h2>Rows by file</h2>
@@ -54,18 +75,23 @@
         </label>
       {% endfor %}
     </fieldset>
-    <noscript><button type="submit">Update</button></noscript>
+    <noscript><button class="button" type="submit">Show selected list</button></noscript>
   </form>
 
   {% include "reports/_issues.html" %}
 
   {% if view.codes %}
   <h2>What the codes mean</h2>
-  <dl class="codes">
-    {% for code, description in view.codes %}
-      <dt><code>{{ code }}</code></dt><dd>{{ description }}</dd>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th scope="col">Code</th><th scope="col">Meaning</th><th scope="col">How to fix</th></tr></thead>
+    <tbody>
+    {% for code, meaning, fix in view.codes %}
+      <tr><td><code>{{ code }}</code></td><td>{{ meaning }}</td><td>{{ fix }}</td></tr>
     {% endfor %}
-  </dl>
+    </tbody>
+  </table>
+  </div>
   {% endif %}
 {% endif %}
 {% endwith %}

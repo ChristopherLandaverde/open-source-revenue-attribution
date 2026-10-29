@@ -6,4 +6,5 @@ app_name = "reports"
 urlpatterns = [
     path("", views.report, name="report"),
     path("validation/", views.validation, name="validation"),
+    path("import/", views.import_csv, name="import"),
 ]

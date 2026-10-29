@@ -1,20 +1,72 @@
+/* Focosys brand tokens (ux-standards skill, references/focosys-brand.md). Product scale.
+   Every color, size and space in app.css comes from here. Contrast ratios (WCAG 2.x) are
+   listed next to each text color, measured on --surface-paper unless noted. */
+
+@font-face {
+  font-family: "DM Sans";
+  src: url("../vendor/fonts/dm-sans-5.1.0-latin-wght.woff2") format("woff2");
+  font-weight: 100 1000;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../vendor/fonts/ibm-plex-mono-5.1.0-latin-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../vendor/fonts/ibm-plex-mono-5.1.0-latin-500.woff2") format("woff2");
+  font-weight: 500 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  --color-bg: #f7f7f5;
-  --color-surface: #ffffff;
-  --color-text: #1d1f23;
-  --color-muted: #5b6270;
-  --color-border: #d9dce1;
-  --color-accent: #1f5fbf;
-  --color-notice-bg: #fff7e0;
-  --color-notice-border: #e3c35a;
-  --color-error-bg: #fdecec;
-  --color-error-border: #d9534f;
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 1rem;
-  --space-4: 1.5rem;
-  --space-5: 2.5rem;
-  --radius: 6px;
+  /* Surfaces */
+  --surface-stone: #D7D4CA;   /* canvas around the working surface */
+  --surface-paper: #F3F0E6;   /* main working surface */
+  --surface-raised: #EBE8DE;  /* table headers, code, notices */
+
+  /* Ink */
+  --ink-primary: #10231F;     /* 14.36:1 on paper, 13.36:1 on raised, 11.04:1 on stone */
+  --ink-secondary: #426B5D;   /* 5.27:1 on paper, 4.90:1 on raised; never on stone (4.05:1) */
+  --line-subtle: rgba(16, 35, 31, 0.22); /* decorative dividers only */
+  --line-control: #10231F;    /* control and framed borders */
+
+  /* States: always paired with a word and a symbol */
+  --state-exception: #B83A2D; /* text, 5.0:1 on paper, 4.65:1 on raised: refused */
+  --state-warning: #8A5A00;   /* text, 5.2:1 on paper, 4.83:1 on raised: review (proposed token, not yet on focosys.io) */
+  --state-verified: #D7FF69;  /* fill only, ink text 14.35:1: accepted */
+  --state-observed: #8CBFFF;  /* fill only, ink text 8.59:1: observed / informational */
+
+  /* Focus */
+  --focus-ring: #10231F;
+  --focus-halo: #D7FF69;
+
+  /* Type */
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --text-title: 18px;   /* verdict, 600 */
+  --text-heading: 15px; /* section heading, 600 */
+  --text-body: 14px;
+  --text-small: 13px;
+  --text-data: 13px;    /* mono, tabular */
+  --text-label: 11px;   /* mono uppercase labels and tags only */
+
+  /* Space (8px base, 4px half step) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Shape and motion */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }

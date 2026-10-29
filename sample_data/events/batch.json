@@ -1,0 +1,283 @@
+{
+  "batch": [
+    {
+      "type": "page",
+      "messageId": "evt-01",
+      "anonymousId": "anon-li-1",
+      "channel": "web",
+      "name": "Pricing",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "page": {
+          "url": "https://www.acme.example/pricing?utm_source=google&utm_medium=cpc&utm_campaign=fall-search&utm_content=ad-b&utm_term=revenue%20attribution",
+          "path": "/pricing",
+          "referrer": "https://www.google.com/",
+          "title": "Pricing"
+        },
+        "campaign": {
+          "source": "google",
+          "medium": "cpc",
+          "name": "fall-search",
+          "content": "ad-b",
+          "term": "revenue attribution"
+        }
+      },
+      "properties": {},
+      "originalTimestamp": "2026-09-02T08:10:00.000Z",
+      "timestamp": "2026-09-02T08:10:00.000Z",
+      "sentAt": "2026-09-02T08:10:01.000Z"
+    },
+    {
+      "type": "identify",
+      "messageId": "evt-02",
+      "anonymousId": "anon-li-1",
+      "userId": "con-nw-li",
+      "channel": "web",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "traits": {
+          "email": "li@northwind.example"
+        }
+      },
+      "originalTimestamp": "2026-09-02T08:14:00.000Z",
+      "timestamp": "2026-09-02T08:14:00.000Z",
+      "sentAt": "2026-09-02T08:14:01.000Z"
+    },
+    {
+      "type": "page",
+      "messageId": "evt-03",
+      "anonymousId": "anon-li-1",
+      "userId": "con-nw-li",
+      "channel": "web",
+      "name": "Pricing",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "page": {
+          "url": "https://www.acme.example/pricing?utm_source=google&utm_medium=cpc&utm_campaign=fall-search&utm_content=ad-b&utm_term=revenue%20attribution",
+          "path": "/pricing",
+          "referrer": "https://www.google.com/",
+          "title": "Pricing"
+        },
+        "campaign": {
+          "source": "google",
+          "medium": "cpc",
+          "name": "fall-search",
+          "content": "ad-b",
+          "term": "revenue attribution"
+        }
+      },
+      "properties": {},
+      "originalTimestamp": "2026-09-02T10:14:58.000+02:00",
+      "timestamp": "2026-09-02T10:15:00.000+02:00",
+      "sentAt": "2026-09-02T08:15:01.000Z"
+    },
+    {
+      "type": "track",
+      "messageId": "evt-04",
+      "anonymousId": "anon-li-1",
+      "userId": "con-nw-li",
+      "channel": "web",
+      "event": "Demo Requested",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "page": {
+          "url": "https://www.acme.example/demo",
+          "path": "/demo",
+          "referrer": "https://www.acme.example/pricing",
+          "title": "Book a demo"
+        },
+        "campaign": {}
+      },
+      "properties": {
+        "plan": "team"
+      },
+      "originalTimestamp": "2026-09-02T08:18:00.000Z",
+      "timestamp": "2026-09-02T08:18:00.000Z",
+      "sentAt": "2026-09-02T08:18:01.000Z"
+    },
+    {
+      "type": "page",
+      "messageId": "evt-05",
+      "anonymousId": "anon-li-1",
+      "userId": "con-nw-li",
+      "channel": "web",
+      "name": "Demo booked",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "page": {
+          "url": "https://www.acme.example/demo/booked",
+          "path": "/demo/booked",
+          "referrer": "https://www.acme.example/demo",
+          "title": "Demo booked"
+        },
+        "campaign": {}
+      },
+      "properties": {},
+      "originalTimestamp": "2026-09-02T08:20:00.000Z",
+      "timestamp": "2026-09-02T08:20:00.000Z",
+      "sentAt": "2026-09-02T08:20:01.000Z"
+    },
+    {
+      "type": "page",
+      "messageId": "evt-06",
+      "anonymousId": "anon-x-1",
+      "userId": "con-unknown",
+      "channel": "web",
+      "name": "Pricing",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "page": {
+          "url": "https://www.acme.example/pricing?utm_source=google&utm_medium=cpc&utm_campaign=fall-search&utm_content=ad-b&utm_term=revenue%20attribution",
+          "path": "/pricing",
+          "referrer": "https://www.google.com/",
+          "title": "Pricing"
+        },
+        "campaign": {
+          "source": "google",
+          "medium": "cpc",
+          "name": "fall-search",
+          "content": "ad-b",
+          "term": "revenue attribution"
+        }
+      },
+      "properties": {},
+      "originalTimestamp": "2026-09-02T09:00:00.000Z",
+      "timestamp": "2026-09-02T09:00:00.000Z",
+      "sentAt": "2026-09-02T09:00:01.000Z"
+    },
+    {
+      "type": "page",
+      "messageId": "evt-07",
+      "anonymousId": "anon-otto-1",
+      "userId": "con-ke-otto",
+      "channel": "web",
+      "name": "Blog",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "campaign": {
+          "source": "newsletter",
+          "medium": "email",
+          "name": "sept-digest"
+        }
+      },
+      "properties": {
+        "url": "https://www.acme.example/blog/audit-trails?utm_source=newsletter&utm_medium=email&utm_campaign=sept-digest",
+        "referrer": ""
+      },
+      "originalTimestamp": "2026-09-03T09:00:00.000Z",
+      "sentAt": "2026-09-03T09:00:02.000Z"
+    },
+    {
+      "type": "page",
+      "messageId": "evt-03",
+      "anonymousId": "anon-li-1",
+      "userId": "con-nw-li",
+      "channel": "web",
+      "name": "Pricing",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "page": {
+          "url": "https://www.acme.example/pricing?utm_source=google&utm_medium=cpc&utm_campaign=fall-search&utm_content=ad-b&utm_term=revenue%20attribution",
+          "path": "/pricing",
+          "referrer": "https://www.google.com/",
+          "title": "Pricing"
+        },
+        "campaign": {
+          "source": "google",
+          "medium": "cpc",
+          "name": "fall-search",
+          "content": "ad-b",
+          "term": "revenue attribution"
+        }
+      },
+      "properties": {},
+      "originalTimestamp": "2026-09-02T10:14:58.000+02:00",
+      "timestamp": "2026-09-02T10:15:00.000+02:00",
+      "sentAt": "2026-09-02T08:16:30.000Z"
+    },
+    {
+      "type": "page",
+      "messageId": "evt-09",
+      "anonymousId": "anon-li-1",
+      "userId": "con-nw-li",
+      "channel": "web",
+      "name": "Pricing",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "page": {
+          "url": "https://www.acme.example/pricing?utm_source=google&utm_medium=cpc&utm_campaign=fall-search&utm_content=ad-b&utm_term=revenue%20attribution",
+          "path": "/pricing",
+          "referrer": "",
+          "title": "Pricing"
+        },
+        "campaign": {
+          "source": "google",
+          "medium": "cpc",
+          "name": "fall-search",
+          "content": "ad-b",
+          "term": "revenue attribution"
+        }
+      },
+      "properties": {},
+      "originalTimestamp": "2026-09-04T10:00:00",
+      "timestamp": "2026-09-04T10:00:00",
+      "sentAt": "2026-09-04T10:00:01"
+    },
+    {
+      "type": "page",
+      "messageId": "evt-10",
+      "anonymousId": "anon-li-2",
+      "userId": "con-nw-li",
+      "channel": "web",
+      "name": "Customers",
+      "context": {
+        "library": {
+          "name": "RudderLabs JavaScript SDK",
+          "version": "3.35.0"
+        },
+        "page": {
+          "url": "https://www.acme.example/customers?utm_source=linkedin&utm_medium=paid-social&utm_campaign=fall-abm",
+          "path": "/customers",
+          "referrer": "https://www.linkedin.com/",
+          "title": "Customers"
+        },
+        "campaign": {
+          "source": "linkedin",
+          "medium": "paid-social",
+          "name": "fall-abm"
+        }
+      },
+      "properties": {},
+      "originalTimestamp": "2026-09-02T08:20:00.000Z",
+      "timestamp": "2026-09-02T08:20:00.000Z",
+      "sentAt": "2026-09-02T08:20:00.500Z"
+    }
+  ]
+}

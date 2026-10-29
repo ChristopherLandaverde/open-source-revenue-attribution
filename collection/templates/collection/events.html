@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Events · Open Source Revenue Attribution{% endblock %}
+{% block content %}
+<h1>Collected events</h1>
+{% if not accepted_count and not rejected_count %}
+  <div class="empty">
+    <p><strong>No events collected yet.</strong></p>
+    {% if not workspaces %}
+      <p>Create a workspace to get a write key:</p>
+      <pre><code>uv run python manage.py create_workspace demo</code></pre>
+    {% endif %}
+    <p>Then POST RudderStack events to <code>/v1/batch</code>{% if demo_enabled %}, or send some from the
+      <a href="{% url 'collection:demo' %}">SDK demo page</a>{% endif %}.</p>
+  </div>
+{% else %}
+  <div aria-live="polite">
+  {% if rejected_count %}
+    <p class="verdict"><span class="tag tag-refused">× Refused</span>
+      {{ rejected_count }} event payload{{ rejected_count|pluralize }} refused. {{ accepted_count }} event{{ accepted_count|pluralize }} accepted.</p>
+  {% else %}
+    <p class="verdict"><span class="tag tag-accepted">✓ Accepted</span>
+      All {{ accepted_count }} event{{ accepted_count|pluralize }} accepted.</p>
+  {% endif %}
+  <p class="context">{{ touchpoint_count }} became touchpoint{{ touchpoint_count|pluralize }}: identified page views of imported contacts.</p>
+  </div>
+
+  <ul class="stats" aria-label="Event counts">
+    <li><span class="label">Accepted</span><span class="value">{{ accepted_count }}</span></li>
+    <li><span class="label">Refused payloads</span><span class="value">{{ rejected_count }}</span></li>
+    <li><span class="label">Accepted retries counted once</span><span class="value">{{ retries }}</span></li>
+    <li><span class="label">Touchpoints from events</span><span class="value">{{ touchpoint_count }}</span></li>
+  </ul>
+
+  {% if refused %}
+  <h2><span class="tag tag-refused">× Refused</span> Refused events <span class="muted">(stored, never used)</span></h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th scope="col">messageId</th><th scope="col" class="num">Times received</th>
+      <th scope="col">Code</th><th scope="col">Field</th><th scope="col">What we saw</th><th scope="col">How to fix</th></tr></thead>
+    <tbody>
+    {% for row in refused %}{% for issue in row.issue_rows %}
+      <tr>
+        <td class="mono">{{ row.message_id|default:"—" }}</td>
+        <td class="num">{{ row.times_received }}</td>
+        <td><code>{{ issue.code }}</code></td>
+        <td class="mono">{{ issue.field|default:"—" }}</td>
+        <td>{{ issue.message }}</td>
+        <td>{{ issue.fix }}</td>
+      </tr>
+    {% endfor %}{% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
+  <h2>Accepted events <span class="muted">(latest 50 by event time)</span></h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th scope="col">Event time (UTC)</th><th scope="col">Type</th><th scope="col">messageId</th>
+      <th scope="col">userId</th><th scope="col">Source / medium / campaign</th><th scope="col">Touchpoint</th></tr></thead>
+    <tbody>
+    {% for row in recent %}
+      <tr>
+        <td class="mono">{{ row.occurred_at|date:"Y-m-d H:i:s" }}</td>
+        <td class="mono">{{ row.type }}{% if row.normalized.event_name %}: {{ row.normalized.event_name }}{% endif %}</td>
+        <td class="mono">{{ row.message_id }}</td>
+        <td class="mono">{{ row.user_id|default:"(anonymous)" }}</td>
+        <td class="mono">{% if row.type == "identify" %}—{% else %}{{ row.campaign_key }}{% endif %}</td>
+        <td>{% if row.became == "touchpoint" %}<span class="tag tag-accepted">✓ Created</span>{% else %}<span class="tag tag-neutral">– Not a touchpoint</span> <span class="small">{{ row.became_text }}</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="context small">Event time is RudderStack <code>timestamp</code>, or <code>originalTimestamp</code> (the browser clock) when absent.
+    Campaign values come only from <code>context.campaign</code>.</p>
+{% endif %}
+
+<h2>Send events</h2>
+<dl class="codes">
+  <dt class="label">Endpoint</dt><dd><code>POST /v1/batch</code> with <code>{"batch": [...]}</code>, or <code>POST /v1/page</code>, <code>/v1/track</code>, <code>/v1/identify</code> with one event</dd>
+  <dt class="label">Auth</dt><dd><code>Authorization: Basic base64(&lt;write key&gt;:)</code>, as the RudderStack SDK sends it</dd>
+  <dt class="label">Rules</dt><dd>Event contract in <code>docs/contract.md</code>, section 3</dd>
+  {% if demo_enabled %}<dt class="label">Try it</dt><dd><a href="{% url 'collection:demo' %}">Send events from the RudderStack SDK demo page</a></dd>{% endif %}
+</dl>
+{% endblock %}

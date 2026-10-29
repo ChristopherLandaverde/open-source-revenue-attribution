@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}SDK demo · Open Source Revenue Attribution{% endblock %}
+{% block content %}
+<h1>Send test events with the RudderStack SDK</h1>
+{% if not workspace %}
+  <div class="empty">
+    <p><strong>No workspace yet, so the SDK has no write key.</strong></p>
+    <p>Create one, then reload this page:</p>
+    <pre><code>uv run python manage.py create_workspace demo</code></pre>
+  </div>
+{% else %}
+  {{ sdk_config|json_script:"sdk-config" }}
+  <p id="sdk-status" class="verdict" aria-live="polite"><span class="tag tag-neutral">… Loading</span> Loading the SDK.</p>
+  <p class="context">This page loads the vendored RudderStack JavaScript SDK
+    (<code>static/vendor/</code>) with workspace <strong>{{ workspace.name }}</strong>'s write key.
+    It sends synthetic events to this server only.</p>
+
+  <ol class="steps">
+    <li>{% if has_utms %}This URL carries UTM parameters, so page views get campaign values.{% else %}<a href="?utm_source=demo-page&amp;utm_medium=sdk&amp;utm_campaign=m2-demo">Reload with UTM parameters</a> so page views get campaign values.{% endif %}</li>
+    <li>Identify as <code>{{ contact_id }}</code>, then send a page view. Only identified page views can become touchpoints.</li>
+    <li>Open <a href="{% url 'collection:events' %}">Events</a> to see what was accepted and what became a touchpoint.</li>
+  </ol>
+
+  <div class="actions">
+    <button class="button" type="button" data-send="identify" disabled>Identify as {{ contact_id }}</button>
+    <button class="button button-primary" type="button" data-send="page" disabled>Send page view</button>
+    <button class="button" type="button" data-send="track" disabled>Send Demo Requested</button>
+    <button class="button" type="button" data-send="reset" disabled>Reset identity</button>
+  </div>
+
+  <h2>Sent from this page</h2>
+  <ul id="sent-log" class="small" hidden></ul>
+  <p class="context small">A touchpoint needs the contact to exist: import the demo data set first, or it converts on the next import.</p>
+
+  <script src="{% static 'vendor/rudderstack-analytics-js-3.35.0.bundled.umd.js' %}"></script>
+  <script src="{% static 'js/sdk-demo.js' %}"></script>
+{% endif %}
+{% endblock %}

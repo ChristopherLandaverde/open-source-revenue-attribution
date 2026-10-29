@@ -6,8 +6,11 @@
   </p>
 
   {% if not report.opportunity_rows %}
-    <p class="empty">No opportunities yet. Load the sample data with
-      <code>uv run python manage.py load_sample_data</code>.</p>
+    <div class="empty">
+      <p><strong>No opportunities yet.</strong></p>
+      <p>Import CSVs on the <a href="{% url 'reports:import' %}">Import CSV</a> page, or run
+        <code>uv run python manage.py load_sample_data</code>.</p>
+    </div>
   {% else %}
   <h2>Credit by campaign</h2>
   <div class="table-wrap">
@@ -16,7 +19,7 @@
       <th scope="col" class="num">Credited amount</th><th scope="col" class="num">Opportunities</th></tr></thead>
     <tbody>
     {% for campaign, currency, amount, count in report.campaign_rows %}
-      <tr><td>{{ campaign }}</td><td>{{ currency }}</td><td class="num">{{ amount|minor_unit:currency }}</td><td class="num">{{ count }}</td></tr>
+      <tr><td class="mono">{{ campaign }}</td><td class="mono">{{ currency }}</td><td class="num">{{ amount|minor_unit:currency }}</td><td class="num">{{ count }}</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -33,9 +36,9 @@
       <tr>
         <td>{{ row.opportunity.name|default:row.opportunity.external_id }}</td>
         <td>{{ row.opportunity.account.name|default:row.opportunity.account.external_id }}</td>
-        <td>{{ row.converted_at|date:"Y-m-d H:i" }} UTC</td>
-        <td>{{ row.credit.touchpoint_id|default:"None eligible" }}</td>
-        <td>{{ row.credit.campaign_key }}</td>
+        <td class="mono">{{ row.converted_at|date:"Y-m-d H:i" }} UTC</td>
+        <td class="mono">{{ row.credit.touchpoint_id|default:"None eligible" }}</td>
+        <td class="mono">{{ row.credit.campaign_key }}</td>
         <td class="num">{{ row.credit.amount|minor_unit:row.credit.currency }} {{ row.credit.currency }}</td>
       </tr>
     {% endfor %}

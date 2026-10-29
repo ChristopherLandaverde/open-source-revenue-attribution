@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Import CSV · Open Source Revenue Attribution{% endblock %}
+{% block content %}
+<h1>Import CSV files</h1>
+<p>Upload the four files in the import format (<code>docs/contract.md</code>, section 2).
+  Every row is validated first. Only accepted rows are loaded.</p>
+{% if last_run %}
+  <p class="context small">Last import: <span class="mono">{{ last_run.source }}</span> ·
+    <span class="mono">{{ last_run.created_at|date:"Y-m-d H:i" }} UTC</span> ·
+    {% if last_run.loaded %}loaded{% else %}refused (strict){% endif %} ·
+    <a href="{% url 'reports:validation' %}">see its validation report</a></p>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+    <div class="notice notice-error" role="alert">
+      {% for error in form.non_field_errors %}<p><strong>{{ error }}</strong></p>{% endfor %}
+    </div>
+  {% endif %}
+  <fieldset>
+    <legend>Files</legend>
+    <p class="context small">Leave a file out and its rows are missing: rows that reference it are refused too.</p>
+    {% for field in form %}{% if field.name != "strict" %}
+      <div class="field">
+        <label for="{{ field.id_for_label }}" class="mono">{{ field.label }}</label>
+        <input type="file" name="{{ field.html_name }}" id="{{ field.id_for_label }}" accept=".csv,text/csv"
+               {% if field.errors %}aria-invalid="true" aria-describedby="{{ field.id_for_label }}-error"{% endif %}>
+        {% if field.errors %}<ul class="errorlist" id="{{ field.id_for_label }}-error">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+    {% endif %}{% endfor %}
+  </fieldset>
+
+  <div class="check">
+    <input type="checkbox" name="strict" id="{{ form.strict.id_for_label }}" {% if form.strict.value %}checked{% endif %}
+           aria-describedby="strict-help">
+    <div>
+      <label for="{{ form.strict.id_for_label }}">{{ form.strict.label }}</label>
+      <p class="context small" id="strict-help">Off by default: accepted rows load and refused rows are listed.</p>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="button button-primary" type="submit" name="action" value="upload">Validate and import files</button>
+    <button class="button" type="submit" name="action" value="demo">Import the demo data set</button>
+  </div>
+  <p class="context small">The demo data set is synthetic and contains 10 invalid rows on purpose.
+    Re-importing the same rows updates them by ID; nothing is duplicated.</p>
+</form>
+{% endblock %}

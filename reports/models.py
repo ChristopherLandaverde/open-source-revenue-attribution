@@ -53,7 +53,13 @@ class Opportunity(models.Model):
 
 
 class Touchpoint(models.Model):
-    external_id = models.CharField(max_length=64, unique=True)
+    class Origin(models.TextChoices):
+        CSV = "csv", "touchpoints.csv"
+        EVENT = "event", "Collected page event"
+
+    # touchpoint_id from touchpoints.csv, or the messageId of the page event it came from.
+    external_id = models.CharField(max_length=64)
+    origin = models.CharField(max_length=8, choices=Origin.choices, default=Origin.CSV)
     contact = models.ForeignKey(Contact, on_delete=models.PROTECT, related_name="touchpoints")
     occurred_at = models.DateTimeField()
     source = models.CharField(max_length=200, blank=True)
@@ -63,6 +69,13 @@ class Touchpoint(models.Model):
     term = models.CharField(max_length=200, blank=True)
     landing_page = models.CharField(max_length=500, blank=True)
     referrer = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["origin", "external_id"], name="touchpoint_unique_origin_external_id"
+            )
+        ]
 
     def __str__(self):
         return self.external_id
