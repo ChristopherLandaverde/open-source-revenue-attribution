@@ -1,0 +1,46 @@
+<section id="results" aria-live="polite">
+  <p class="context">
+    Model: <strong>{{ report.model_name }}</strong> ·
+    Lookback window: <strong>{{ report.lookback_days }} days</strong> ·
+    Amount: <strong>{{ report.metric_label }}</strong>
+  </p>
+
+  {% if not report.opportunity_rows %}
+    <p class="empty">No opportunities yet. Load the sample data with
+      <code>uv run python manage.py load_sample_data</code>.</p>
+  {% else %}
+  <h2>Credit by campaign</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th scope="col">Source / medium / campaign</th><th scope="col">Currency</th>
+      <th scope="col" class="num">Credited amount</th><th scope="col" class="num">Opportunities</th></tr></thead>
+    <tbody>
+    {% for campaign, currency, amount, count in report.campaign_rows %}
+      <tr><td>{{ campaign }}</td><td>{{ currency }}</td><td class="num">{{ amount }}</td><td class="num">{{ count }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Credit by opportunity</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th scope="col">Opportunity</th><th scope="col">Account</th><th scope="col">Conversion time</th>
+      <th scope="col">Credited touchpoint</th><th scope="col">Source / medium / campaign</th>
+      <th scope="col" class="num">Credited amount</th></tr></thead>
+    <tbody>
+    {% for row in report.opportunity_rows %}
+      <tr>
+        <td>{{ row.opportunity.name }}</td>
+        <td>{{ row.opportunity.contact.account.name }}</td>
+        <td>{{ row.converted_at|date:"Y-m-d H:i" }} UTC</td>
+        <td>{{ row.credit.touchpoint_id|default:"None eligible" }}</td>
+        <td>{{ row.credit.campaign_key }}</td>
+        <td class="num">{{ row.credit.amount }} {{ row.credit.currency }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</section>

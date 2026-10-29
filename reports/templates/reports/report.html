@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}First-touch report · Open Source Revenue Attribution{% endblock %}
+{% block content %}
+<h1>Sample report: {{ report.model_name }} attribution</h1>
+<p class="notice">
+  This report shows how the <strong>{{ report.model_name }}</strong> model assigns credit to
+  touchpoints associated with each opportunity. It describes association under a named rule,
+  not causal impact: it does not show that a campaign caused a deal.
+</p>
+
+<form class="controls" hx-get="{% url 'reports:report' %}" hx-target="#results" hx-swap="outerHTML"
+      hx-trigger="change" hx-push-url="true">
+  <fieldset>
+    <legend>Amount to attribute</legend>
+    {% for value, label in metrics.items %}
+      <label>
+        <input type="radio" name="metric" value="{{ value }}" {% if value == report.metric %}checked{% endif %}>
+        {{ label }}
+      </label>
+    {% endfor %}
+  </fieldset>
+  <noscript><button type="submit">Update</button></noscript>
+</form>
+
+{% include "reports/_results.html" %}
+{% endblock %}
