@@ -1,0 +1,54 @@
+name: Feedback from using it
+description: You tried Open Source Revenue Attribution. Tell us what worked, what didn't, and what you'd need next.
+title: "Feedback: "
+labels: ["feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying it. We read every one of these before deciding which connectors and
+        features come next. Don't paste real customer data, write keys or passwords.
+  - type: dropdown
+    id: role
+    attributes:
+      label: Who are you?
+      options:
+        - Marketer or RevOps at a B2B company
+        - Founder
+        - Agency or consultant
+        - Developer or analytics engineer
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: setup
+    attributes:
+      label: How did you run it?
+      options:
+        - Locally with the demo data (SQLite)
+        - Locally with Docker Postgres
+        - Self-hosted with compose.production.yml
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: job
+    attributes:
+      label: What were you trying to find out?
+      description: The question you wanted the numbers to answer.
+    validations:
+      required: true
+  - type: textarea
+    id: worked
+    attributes:
+      label: What worked, and what got in the way?
+      description: Setup steps, import errors, numbers you didn't trust, pages that confused you.
+  - type: textarea
+    id: sources
+    attributes:
+      label: Where does your data live today?
+      description: CRM, ad platforms, event tracking (for example HubSpot, Salesforce, Google Ads, LinkedIn Ads, RudderStack, Segment). This decides which connector comes first.
+  - type: textarea
+    id: missing
+    attributes:
+      label: What would you need before using it for real?

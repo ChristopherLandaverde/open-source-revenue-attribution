@@ -1,6 +1,6 @@
 [project]
 name = "open-source-revenue-attribution"
-version = "0.0.1"
+version = "0.1.0"
 description = "Self-hostable, auditable B2B revenue attribution."
 readme = "README.md"
 license = "MIT"

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Self-hosting guide
+    url: https://github.com/ChristopherLandaverde/open-source-revenue-attribution/blob/main/docs/self-hosting.md
+    about: Install, first admin, TLS, allowed origins, backups and upgrades.

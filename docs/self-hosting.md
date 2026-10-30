@@ -1,0 +1,280 @@
+# Self-hosting
+
+Run Open Source Revenue Attribution on your own server: the Django app (gunicorn, static files
+served by WhiteNoise) and PostgreSQL 17, from `compose.production.yml`, behind a reverse proxy
+that terminates TLS.
+
+How this compares with Plausible, Umami, PostHog and Matomo, with sources:
+[research/m5-self-hosting.md](research/m5-self-hosting.md). Where we differ:
+[decisions.md](decisions.md) (M5).
+
+**Verified 2026-10-29** on Docker 28 with Compose v2 and Caddy 2 (`tls internal` on
+localhost): build, start, migrations on PostgreSQL 17, first admin, sign-in over HTTPS, demo
+import, every page, events from an allowed and a refused origin, `pg_dump` backup and restore.
+Not yet tried on a public domain with a real Let's Encrypt certificate.
+
+## Contents
+
+1. [Requirements](#requirements)
+2. [Install](#install)
+3. [Create the first admin](#create-the-first-admin)
+4. [Reverse proxy and TLS](#reverse-proxy-and-tls)
+5. [Send events from your site](#send-events-from-your-site)
+6. [Configuration reference](#configuration-reference)
+7. [Security checklist](#security-checklist)
+8. [Backups and restore](#backups-and-restore)
+9. [Upgrades and migrations](#upgrades-and-migrations)
+10. [Troubleshooting](#troubleshooting)
+
+## Requirements
+
+- A Linux host with Docker Engine and the Compose v2 plugin (`docker compose version`).
+- 1 GB RAM is enough for the demo data. Touchpoints are recomputed from all events on each
+  collection request, so the app is not tuned for large event volumes yet.
+- A domain name pointing at the host, and ports 80 and 443 open, for automatic HTTPS.
+
+## Install
+
+```sh
+git clone https://github.com/ChristopherLandaverde/open-source-revenue-attribution.git
+cd open-source-revenue-attribution
+git checkout v0.1.0            # a release tag; see CHANGELOG.md (not tagged yet: use main)
+cp .env.example .env
+```
+
+Edit `.env`. These are the values a server needs; every other setting is optional and listed
+in `.env.example`:
+
+```sh
+DEBUG=false
+SECRET_KEY=<python3 -c "import secrets; print(secrets.token_urlsafe(50))">
+POSTGRES_PASSWORD=<python3 -c "import secrets; print(secrets.token_hex(24))">
+ALLOWED_HOSTS=attribution.acme.example
+CSRF_TRUSTED_ORIGINS=https://attribution.acme.example
+BEHIND_PROXY=true
+SECURE_HSTS_SECONDS=3600
+# The sites whose pages send events from the browser (see "Send events from your site"):
+COLLECT_ALLOWED_ORIGINS=https://www.acme.example
+```
+
+Use letters and digits only for `POSTGRES_PASSWORD`: the stack puts it in a database URL.
+
+Build and start:
+
+```sh
+docker compose -f compose.production.yml up -d --build --wait
+docker compose -f compose.production.yml exec app python manage.py check --deploy
+```
+
+`--wait` returns once PostgreSQL and the app pass their health checks. The app container runs
+`migrate` before gunicorn starts. It listens on `127.0.0.1:8000` only (change with `APP_PORT`),
+so nothing is public until the reverse proxy is set up. `check --deploy` should print
+`System check identified no issues (2 silenced)`; the two silenced checks are explained in
+[decisions.md](decisions.md).
+
+## Create the first admin
+
+Every page except the event endpoint needs a signed-in user. There is no public sign-up and no
+default password. Create the first account from the server:
+
+```sh
+docker compose -f compose.production.yml exec app python manage.py createsuperuser
+```
+
+It asks for a username, an email address and a password. Without a terminal (provisioning
+scripts), pass the password in the environment and remove it afterwards:
+
+```sh
+docker compose -f compose.production.yml exec -e DJANGO_SUPERUSER_PASSWORD='<password>' app \
+  python manage.py createsuperuser --noinput --username admin --email admin@acme.example
+```
+
+`--noinput` fails if the username exists, so running it twice changes nothing. Sign in at
+`https://<your domain>/accounts/login/`. Add more people, or reset a password, in Django admin
+at `/admin/` (superusers only). Every signed-in user sees all data: there are no roles or
+per-workspace permissions yet.
+
+### Try it with the demo data
+
+```sh
+docker compose -f compose.production.yml exec app python manage.py load_sample_data
+```
+
+This loads the synthetic demo accounts, contacts, opportunities and touchpoints into the same
+dataset your real data goes in, and there is no command to remove them again. Try it on a
+throwaway stack, then wipe it with `docker compose -f compose.production.yml down -v` (deletes
+the database volume) before importing real data.
+
+## Reverse proxy and TLS
+
+Bring your own proxy, as with Umami and Matomo. Plausible also documents this route. The proxy
+must:
+
+- terminate TLS and forward to `127.0.0.1:8000`;
+- set (overwrite, never append) `X-Forwarded-Proto`. With `BEHIND_PROXY=true`, Django trusts
+  that header to know the request was HTTPS. That is only safe because the app port is bound to
+  127.0.0.1 and only the proxy can reach it;
+- pass the `Host` header through, or list the public origin in `CSRF_TRUSTED_ORIGINS`.
+
+**Caddy** (gets and renews a Let's Encrypt certificate itself):
+[`deploy/Caddyfile.example`](../deploy/Caddyfile.example)
+
+```caddy
+attribution.acme.example {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8000
+}
+```
+
+**nginx** with certbot certificates:
+[`deploy/nginx.conf.example`](../deploy/nginx.conf.example). Raise `client_max_body_size` if
+your CSV uploads are larger than 20 MB.
+
+With `DEBUG=false`, plain HTTP requests are redirected to HTTPS, session and CSRF cookies are
+`Secure`, and `SECURE_HSTS_SECONDS` sends HSTS. Start at 3600 and raise it to 31536000 once
+HTTPS works. Browsers remember HSTS, so a mistake cannot be undone quickly.
+`includeSubDomains` and `preload` stay off unless you set them, because they bind your whole
+parent domain. A plain-HTTP deployment on a private network needs `HTTPS=false`, and
+`check --deploy` will warn about it.
+
+## Send events from your site
+
+```sh
+docker compose -f compose.production.yml exec app python manage.py create_workspace website
+# Write key: <key>
+```
+
+Load the RudderStack JavaScript SDK on your site with that write key and
+`dataPlaneUrl: "https://attribution.acme.example"`. Events go to `/v1/batch` (also `/v1/page`,
+`/v1/track`, `/v1/identify`). The rules for what is accepted are in
+[contract.md](contract.md), section 3.
+
+**Allowed origins.** Browsers send an `Origin` header with cross-site requests. `/v1/` accepts
+them only from:
+
+- this server's own origin;
+- origins listed in `COLLECT_ALLOWED_ORIGINS`, as scheme and host (comma-separated, no path):
+  `https://www.acme.example,https://app.acme.example`.
+
+Any other origin gets `403` on the preflight and on the POST, and nothing is stored. Requests
+without `Origin` (your backend, `curl`, a RudderStack server forwarding events) need only the
+write key. The allowlist is **not authentication**: the write key is visible in your pages'
+JavaScript, and a non-browser client can send any `Origin` header it likes. It stops other
+websites from making their visitors' browsers post events into your revenue data.
+
+Plausible, Umami and PostHog accept browser events from any origin. We refuse them until you
+list your sites (the reasons are in [decisions.md](decisions.md)). `COLLECT_ALLOWED_ORIGINS=*`
+gives you their behavior, and `check --deploy` warns about it. The **Events** page shows the
+current list.
+
+Check from the server:
+
+```sh
+curl -si -X OPTIONS https://attribution.acme.example/v1/batch \
+  -H 'Origin: https://www.acme.example' -H 'Access-Control-Request-Method: POST' | head -1
+# HTTP/2 204    (listed)       HTTP/2 403    (not listed)
+```
+
+## Configuration reference
+
+Every setting, with its default and production value, is in
+[`.env.example`](../.env.example). A test fails if a setting is read in `config/settings.py`
+without being listed there. The ones specific to the Docker stack:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `POSTGRES_PASSWORD` | required | Database password; the stack builds `DATABASE_URL` from it |
+| `MIGRATE_ON_START` | `true` | Run `migrate` when the app container starts |
+| `WEB_CONCURRENCY` | `2` | gunicorn worker processes |
+| `APP_PORT` | `8000` | Port on 127.0.0.1 the proxy forwards to |
+| `OSRA_VERSION` | `local` | Tag for the built image, e.g. `0.1.0` |
+| `OSRA_ENV_FILE` | `.env` | The env file the app container reads |
+
+## Security checklist
+
+`manage.py check --deploy` checks these. Run it after every configuration change; CI runs it
+with production-like settings.
+
+| Check | How | Checked by |
+|---|---|---|
+| `DEBUG` off | `DEBUG=false` (forced in the compose file) | Django `security.W018` |
+| Long random `SECRET_KEY` | 50+ random characters | Django `security.W009` |
+| `ALLOWED_HOSTS` is your domain | never `*` | `osra.W001` |
+| HTTPS redirect, `Secure` cookies | on by default when `DEBUG=false` | Django `security.W008`, `W012`, `W016`, and `osra.W005` |
+| HSTS | `SECURE_HSTS_SECONDS` > 0 | Django `security.W004` |
+| Proxy header trusted only behind the proxy | `BEHIND_PROXY=true`, app bound to 127.0.0.1 | this guide |
+| Form posts from your domain | `CSRF_TRUSTED_ORIGINS=https://<domain>` | sign-in fails with 403 if wrong |
+| Browser events only from your sites | `COLLECT_ALLOWED_ORIGINS` lists origins, not `*` | `osra.W002` (wildcard), `osra.W006` (malformed) |
+| SDK demo page off | leave `COLLECT_DEMO_PAGE` unset | `osra.W003` |
+| PostgreSQL, not SQLite | the compose stack | `osra.W004` |
+| Admin accounts | strong passwords, Django's validators enforce length and common-password rules | `createsuperuser` |
+
+The database port is not published, the app runs as a non-root user, and `.env` is excluded
+from the image (`.dockerignore`).
+
+## Backups and restore
+
+Everything (records, events, users, write keys) is in PostgreSQL. Back it up with `pg_dump`,
+and copy the dump off the host:
+
+```sh
+docker compose -f compose.production.yml exec -T db \
+  pg_dump -U osra -d osra --format=custom > osra-$(date +%F).dump
+```
+
+Keep `.env` too (in a password manager, not in git). Without the same `SECRET_KEY`, every
+user's session ends, but no data is lost.
+
+Restore into a running stack, replacing the current data:
+
+```sh
+docker compose -f compose.production.yml stop app
+docker compose -f compose.production.yml exec -T db psql -U osra -d postgres \
+  -c "DROP DATABASE osra" -c "CREATE DATABASE osra OWNER osra"
+docker compose -f compose.production.yml exec -T db \
+  pg_restore -U osra -d osra --no-owner < osra-2026-10-29.dump
+docker compose -f compose.production.yml start app
+```
+
+Test a restore once before you rely on the backups.
+
+## Upgrades and migrations
+
+1. Read the release's entry in [CHANGELOG.md](../CHANGELOG.md). Every release says whether it
+   has database migrations and whether anything must be done by hand.
+2. Back up (above).
+3. Switch to the new release and rebuild:
+
+   ```sh
+   git fetch --tags && git checkout v0.2.0
+   OSRA_VERSION=0.2.0 docker compose -f compose.production.yml up -d --build --wait
+   docker compose -f compose.production.yml logs app | grep -A20 "Running migrations"
+   ```
+
+   The new container applies migrations before it serves requests (as Plausible, Umami and
+   PostHog do). To run them yourself instead, set `MIGRATE_ON_START=false` and run
+   `docker compose -f compose.production.yml run --rm app python manage.py migrate` before
+   `up`.
+4. Check `/healthz`, sign in, and open the model comparison.
+
+**Rolling back:** migrations are not reversed automatically. Check out the previous tag and
+restore the backup you made in step 2.
+
+PostgreSQL major upgrades (17 to 18, for example) need a dump and restore into a new volume.
+The `postgres` image cannot upgrade a data directory in place.
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `Set POSTGRES_PASSWORD in .env` when starting | Add `POSTGRES_PASSWORD` to `.env` |
+| `ImproperlyConfigured: Set the SECRET_KEY environment variable` | Add `SECRET_KEY` to `.env` |
+| `400 Bad Request` on every page | The domain is not in `ALLOWED_HOSTS` |
+| Redirect loop | The proxy does not send `X-Forwarded-Proto: https`, or `BEHIND_PROXY` is not `true` |
+| `403 CSRF verification failed` when signing in | Add `https://<domain>` to `CSRF_TRUSTED_ORIGINS` |
+| Browser console: CORS error on `/v1/batch`; response `403 Origin ... is not allowed` | Add the page's origin to `COLLECT_ALLOWED_ORIGINS` and restart the app |
+| `401` from `/v1/` | Missing or wrong write key (`create_workspace <name>` prints it again) |
+| Unstyled pages | The image was built without `collectstatic`. Rebuild with `--build` |
+
+Logs: `docker compose -f compose.production.yml logs -f app`. Health: `GET /healthz` returns
+`{"status": "ok"}` when the app can reach the database.

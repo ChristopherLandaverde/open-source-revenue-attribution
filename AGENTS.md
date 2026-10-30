@@ -12,13 +12,20 @@ docker compose up -d --wait db                            # local Postgres
 uv run python manage.py migrate
 uv run python manage.py load_sample_data                  # idempotent
 uv run python manage.py create_workspace demo             # prints a write key for /v1/
+uv run python manage.py createsuperuser                   # every page needs a sign-in
 uv run python manage.py runserver                         # http://127.0.0.1:8000/
 
 uv run ruff check . && uv run ruff format --check .       # lint + format
 uv run python manage.py check
 uv run python manage.py makemigrations --check --dry-run
 uv run pytest                                             # all tests (in-memory SQLite)
+TEST_DATABASE_URL=postgres://osra:osra@localhost:5432/osra uv run pytest   # same, on Postgres
 ```
+
+Production-like deploy check (CI runs it too):
+`DEBUG=false SECRET_KEY=<50+ random chars> DATABASE_URL=postgres://u:p@db/x ALLOWED_HOSTS=attribution.example.com BEHIND_PROXY=true SECURE_HSTS_SECONDS=3600 uv run python manage.py check --deploy --fail-level WARNING`.
+Self-hosted stack: `docker compose -f compose.production.yml up -d --build --wait` (see
+`docs/self-hosting.md`). Releases: `docs/release.md`; never tag or publish without Christopher.
 
 All of the check commands must pass before a commit; CI runs the same list.
 
@@ -48,6 +55,13 @@ no React/Vite) · Django ORM + migrations on PostgreSQL · pytest + pytest-djang
   impact. Always show the model name and lookback window next to numbers.
 - **Data:** synthetic only (`*.example` domains). Never commit `.env` or real personal data.
 - **Changing attribution math or report meaning** needs a `needs-decision` issue first.
+- **Auth:** `LoginRequiredMiddleware` protects every view. Only `/v1/` (write-key auth), the
+  sign-in page and `/healthz` are `@login_not_required`; don't add another without a reason
+  in the PR. Page tests use the signed-in `client` fixture (`tests/conftest.py`);
+  `anon_client` is for unauthenticated checks.
+- **Settings:** every new environment setting goes in `.env.example` (a test enforces it) and,
+  if it matters on a server, in `docs/self-hosting.md`.
+- **Changelog:** user-visible changes add a line under `## [Unreleased]` in `CHANGELOG.md`.
 - HTMX endpoints return HTML fragments; full page and fragment share one template include.
 - Every reason code needs a fix line in `reports/fixes.py` (UI copy; a test enforces it).
 - UI follows the `ux-standards` skill (Focosys tokens in `static/css/tokens.css`; no raw hex in

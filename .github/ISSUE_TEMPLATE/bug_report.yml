@@ -1,0 +1,49 @@
+name: Bug report
+description: Something is broken, or a number looks wrong.
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use synthetic data in examples (`*.example` domains). Don't paste real personal data,
+        write keys, SECRET_KEY or passwords. For a security problem, don't open a public issue:
+        contact the maintainer privately.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v0.1.0 or the output of git rev-parse --short HEAD
+    validations:
+      required: true
+  - type: dropdown
+    id: setup
+    attributes:
+      label: How are you running it?
+      options:
+        - Local, SQLite
+        - Local, Docker Postgres
+        - compose.production.yml
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Commands, the page you were on, and the input (a minimal CSV or event is ideal).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened
+      description: For a wrong number, include the model, the metric (pipeline or won) and the lookback window shown on the page.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or check output
+      description: For example `docker compose -f compose.production.yml logs app` or `manage.py check --deploy`.
+      render: text
