@@ -8,7 +8,7 @@ body:
       value: |
         Use synthetic data in examples (`*.example` domains). Don't paste real personal data,
         write keys, SECRET_KEY or passwords. For a security problem, don't open a public issue:
-        contact the maintainer privately.
+        report it privately as described in SECURITY.md.
   - type: input
     id: version
     attributes:
