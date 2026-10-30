@@ -8,6 +8,12 @@ does. How releases are made: [docs/release.md](docs/release.md).
 
 ## [Unreleased]
 
+### Changed
+
+- **README.** Leads with the problem and a verified number from the demo data, with a proof
+  GIF recorded from the running app. Event sending, the model table and the code layout moved
+  to [docs/how-it-works.md](docs/how-it-works.md).
+
 ## [0.1.0] - Unreleased (not tagged)
 
 First release: milestones M0 to M5. Reports state association under a named model, never
