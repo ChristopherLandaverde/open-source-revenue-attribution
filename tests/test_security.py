@@ -224,7 +224,9 @@ def test_deploy_checks_flag_unsafe_settings(settings):
     settings.COLLECT_DEMO_PAGE = True
     settings.HTTPS = False
     ids = deploy_ids()
-    assert {"osra.W001", "osra.W002", "osra.W003", "osra.W004", "osra.W005"} <= ids
+    assert {"osra.W001", "osra.W002", "osra.W003", "osra.W005"} <= ids
+    sqlite = settings.DATABASES["default"]["ENGINE"].endswith("sqlite3")
+    assert ("osra.W004" in ids) == sqlite  # tests may run on PostgreSQL (TEST_DATABASE_URL)
 
 
 def test_deploy_checks_quiet_for_a_safe_configuration(settings):

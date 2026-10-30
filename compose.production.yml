@@ -1,0 +1,39 @@
+# Self-hosted deployment: the app (gunicorn + WhiteNoise) and PostgreSQL.
+# Put a TLS reverse proxy (Caddy, nginx, Traefik) in front; the app listens on 127.0.0.1 only.
+#   cp .env.example .env    # then set the production values (docs/self-hosting.md)
+#   docker compose -f compose.production.yml up -d --build --wait
+name: osra
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: osra
+      POSTGRES_USER: osra
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U osra -d osra"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    image: osra:${OSRA_VERSION:-local}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: ${OSRA_ENV_FILE:-.env}
+    environment:
+      # Always PostgreSQL in this stack, whatever DATABASE_URL says in .env.
+      DATABASE_URL: postgres://osra:${POSTGRES_PASSWORD}@db:5432/osra
+      DEBUG: "false"
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+
+volumes:
+  db-data:
