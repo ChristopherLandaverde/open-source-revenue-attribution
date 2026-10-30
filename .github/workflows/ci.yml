@@ -27,7 +27,44 @@ jobs:
         run: uv run ruff format --check .
       - name: Django system checks
         run: uv run python manage.py check
+      - name: Deployment checks (production-like settings)
+        env:
+          DEBUG: "false"
+          SECRET_KEY: ci-only-deploy-check-key-not-secret-0123456789-abcdefghijklmnop
+          DATABASE_URL: postgres://osra:osra@localhost:5432/osra
+          ALLOWED_HOSTS: attribution.example.com
+          CSRF_TRUSTED_ORIGINS: https://attribution.example.com
+          BEHIND_PROXY: "true"
+          SECURE_HSTS_SECONDS: "3600"
+        run: uv run python manage.py check --deploy --fail-level WARNING
       - name: Migrations are up to date
         run: uv run python manage.py makemigrations --check --dry-run
-      - name: Tests
+      - name: Tests (SQLite)
+        run: uv run pytest
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17
+        env:
+          POSTGRES_DB: osra
+          POSTGRES_USER: osra
+          POSTGRES_PASSWORD: osra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U osra -d osra"
+          --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      SECRET_KEY: ci-only-not-secret
+      TEST_DATABASE_URL: postgres://osra:osra@localhost:5432/osra
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --locked --python 3.12
+      - name: Tests (PostgreSQL 17)
         run: uv run pytest
