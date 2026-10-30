@@ -236,3 +236,17 @@ def test_deploy_checks_quiet_for_a_safe_configuration(settings):
     settings.HTTPS = True
     ids = deploy_ids()
     assert not {"osra.W001", "osra.W002", "osra.W003", "osra.W005"} & ids
+
+
+def test_events_page_says_which_sites_may_send(client, settings):
+    page = client.get("/events/").content.decode()
+    assert "Browser pages on this server only" in page and "COLLECT_ALLOWED_ORIGINS" in page
+    settings.COLLECT_ALLOWED_ORIGINS = [ALLOWED]
+    page = client.get("/events/").content.decode()
+    assert ALLOWED in page and "Other sites get 403" in page
+
+
+def test_malformed_allowed_origins_are_flagged(settings):
+    settings.COLLECT_ALLOWED_ORIGINS = ["www.acme.example", "https://acme.example/blog", ALLOWED]
+    warnings = [i for i in run_checks() if i.id == "osra.W006"]
+    assert len(warnings) == 2

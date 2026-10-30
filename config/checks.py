@@ -53,3 +53,22 @@ def deployment_checks(app_configs, **kwargs):
             )
         )
     return issues
+
+
+@register(Tags.security)
+def allowed_origins_format(app_configs, **kwargs):
+    """An origin is scheme + host (+ port). Anything else would never match a browser's Origin."""
+    issues = []
+    for origin in settings.COLLECT_ALLOWED_ORIGINS:
+        if origin == "*":
+            continue
+        scheme, sep, rest = origin.rstrip("/").partition("://")
+        if scheme not in ("http", "https") or not sep or not rest or "/" in rest:
+            issues.append(
+                Warning(
+                    f"COLLECT_ALLOWED_ORIGINS entry {origin!r} is not an origin and never matches.",
+                    hint="Use scheme and host only, e.g. https://www.acme.example (no path).",
+                    id="osra.W006",
+                )
+            )
+    return issues

@@ -185,6 +185,7 @@ def events(request):
         "recent": recent,
         "refused": refused,
         "demo_enabled": settings.COLLECT_DEMO_PAGE,
+        "allowed_origins": [o for o in settings.COLLECT_ALLOWED_ORIGINS if o],
     }
     return render(request, "collection/events.html", context)
 

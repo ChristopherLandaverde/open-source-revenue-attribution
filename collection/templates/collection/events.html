@@ -81,6 +81,15 @@
 <dl class="codes">
   <dt class="label">Endpoint</dt><dd><code>POST /v1/batch</code> with <code>{"batch": [...]}</code>, or <code>POST /v1/page</code>, <code>/v1/track</code>, <code>/v1/identify</code> with one event</dd>
   <dt class="label">Auth</dt><dd><code>Authorization: Basic base64(&lt;write key&gt;:)</code>, as the RudderStack SDK sends it</dd>
+  <dt class="label">Allowed sites</dt><dd>
+    {% if allowed_origins %}
+      Browser pages on this server{% for o in allowed_origins %}, <code>{{ o }}</code>{% endfor %}. Other sites get 403.
+    {% else %}
+      <span class="tag tag-review">! Review</span> Browser pages on this server only. Pages on other sites get 403
+      until their origin is listed, e.g. <code>COLLECT_ALLOWED_ORIGINS=https://www.acme.example</code>.
+    {% endif %}
+    <span class="context small">Server-side senders (no <code>Origin</code> header) need only the write key. The list is not a password:
+      the write key is visible in your pages' JavaScript.</span></dd>
   <dt class="label">Rules</dt><dd>Event contract in <code>docs/contract.md</code>, section 3</dd>
   {% if demo_enabled %}<dt class="label">Try it</dt><dd><a href="{% url 'collection:demo' %}">Send events from the RudderStack SDK demo page</a></dd>{% endif %}
 </dl>
