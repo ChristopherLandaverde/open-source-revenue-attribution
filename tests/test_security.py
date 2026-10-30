@@ -4,7 +4,7 @@ import base64
 import json
 
 import pytest
-from django.core.checks import run_checks
+from django.core.checks import WARNING, run_checks
 from django.core.management import call_command
 from django.urls import reverse
 
@@ -142,18 +142,37 @@ def test_server_side_senders_need_no_origin(anon_client, workspace):
     assert "Access-Control-Allow-Origin" not in response
 
 
-def test_cross_origin_is_refused_by_default(anon_client, workspace):
-    preflight = anon_client.options("/v1/batch", HTTP_ORIGIN=ALLOWED)
-    assert preflight.status_code == 403
-    assert "Access-Control-Allow-Origin" not in preflight
+def test_any_origin_is_allowed_by_default(anon_client, workspace):
+    """The industry default (Plausible, Umami, PostHog): browser events from any site."""
+    preflight = anon_client.options(
+        "/v1/batch", HTTP_ORIGIN=OTHER, HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST"
+    )
+    assert preflight.status_code == 204
+    assert preflight["Access-Control-Allow-Origin"] == OTHER  # echoed, never a literal "*"
 
-    response = send(anon_client, HTTP_ORIGIN=ALLOWED, **auth())
-    assert response.status_code == 403
-    assert "COLLECT_ALLOWED_ORIGINS" in response.json()["error"]
+    response = send(anon_client, HTTP_ORIGIN=OTHER, **auth())
+    assert response.status_code == 200
+    assert response.json()["accepted"] == 1
+    assert response["Access-Control-Allow-Origin"] == OTHER
+
+
+def test_any_origin_still_needs_a_write_key(anon_client, workspace):
+    response = send(anon_client, HTTP_ORIGIN=OTHER)
+    assert response.status_code == 401
     assert not CollectedEvent.objects.exists()
 
 
-def test_same_origin_browser_requests_are_allowed(anon_client, workspace):
+def test_empty_list_allows_same_origin_only(anon_client, workspace, settings):
+    settings.COLLECT_ALLOWED_ORIGINS = []
+    assert anon_client.options("/v1/batch", HTTP_ORIGIN=ALLOWED).status_code == 403
+    response = send(anon_client, HTTP_ORIGIN=ALLOWED, **auth())
+    assert response.status_code == 403
+    assert "COLLECT_ALLOWED_ORIGINS" in response.json()["error"]
+    assert send(anon_client, HTTP_ORIGIN="http://testserver", **auth()).status_code == 200
+
+
+def test_same_origin_browser_requests_are_allowed(anon_client, workspace, settings):
+    settings.COLLECT_ALLOWED_ORIGINS = [ALLOWED]
     response = send(anon_client, HTTP_ORIGIN="http://testserver", **auth())
     assert response.status_code == 200
     assert response.json()["accepted"] == 1
@@ -200,13 +219,6 @@ def test_unlisted_origin_is_refused_when_others_are_allowed(anon_client, workspa
     assert not CollectedEvent.objects.exists()
 
 
-def test_wildcard_allows_any_origin(anon_client, workspace, settings):
-    settings.COLLECT_ALLOWED_ORIGINS = ["*"]
-    response = send(anon_client, HTTP_ORIGIN=OTHER, **auth())
-    assert response.status_code == 200
-    assert response["Access-Control-Allow-Origin"] == OTHER  # echoed, never a literal "*"
-
-
 def test_get_on_the_endpoint_is_405(anon_client, workspace):
     assert anon_client.get("/v1/batch").status_code == 405
 
@@ -224,7 +236,7 @@ def test_deploy_checks_flag_unsafe_settings(settings):
     settings.COLLECT_DEMO_PAGE = True
     settings.HTTPS = False
     ids = deploy_ids()
-    assert {"osra.W001", "osra.W002", "osra.W003", "osra.W005"} <= ids
+    assert {"osra.W001", "osra.W003", "osra.W005"} <= ids
     sqlite = settings.DATABASES["default"]["ENGINE"].endswith("sqlite3")
     assert ("osra.W004" in ids) == sqlite  # tests may run on PostgreSQL (TEST_DATABASE_URL)
 
@@ -235,12 +247,21 @@ def test_deploy_checks_quiet_for_a_safe_configuration(settings):
     settings.COLLECT_DEMO_PAGE = False
     settings.HTTPS = True
     ids = deploy_ids()
-    assert not {"osra.W001", "osra.W002", "osra.W003", "osra.W005"} & ids
+    assert not {"osra.W001", "osra.W003", "osra.W005", "osra.I001"} & ids
+
+
+def test_unrestricted_origins_are_reported_as_info_not_a_failure(settings):
+    settings.COLLECT_ALLOWED_ORIGINS = ["*"]
+    issues = [i for i in run_checks(include_deployment_checks=True) if i.id == "osra.I001"]
+    assert len(issues) == 1
+    assert issues[0].level < WARNING
 
 
 def test_events_page_says_which_sites_may_send(client, settings):
     page = client.get("/events/").content.decode()
-    assert "Browser pages on this server only" in page and "COLLECT_ALLOWED_ORIGINS" in page
+    assert "Any site." in page and "COLLECT_ALLOWED_ORIGINS" in page
+    settings.COLLECT_ALLOWED_ORIGINS = []
+    assert "Browser pages on this server only" in client.get("/events/").content.decode()
     settings.COLLECT_ALLOWED_ORIGINS = [ALLOWED]
     page = client.get("/events/").content.decode()
     assert ALLOWED in page and "Other sites get 403" in page

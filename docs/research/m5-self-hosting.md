@@ -182,6 +182,10 @@ setting covers `matomo.php`.
 
 ## Implications for OSRA
 
+> **Outcome (2026-10-29):** the default-deny proposal discussed below was not adopted. OSRA
+> follows the standard: any origin by default, an optional list to restrict it.
+> See [decisions.md](../decisions.md), M5.
+
 **CORS default-deny deviates from the standard.** Every Docker-first tool in this survey
 accepts browser events from any origin; only Matomo allowlists, and it does so to protect its
 cookie-authenticated API. Default-deny until `ALLOWED_ORIGINS` is set is still defensible for

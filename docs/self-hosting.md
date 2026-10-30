@@ -53,8 +53,8 @@ ALLOWED_HOSTS=attribution.acme.example
 CSRF_TRUSTED_ORIGINS=https://attribution.acme.example
 BEHIND_PROXY=true
 SECURE_HSTS_SECONDS=3600
-# The sites whose pages send events from the browser (see "Send events from your site"):
-COLLECT_ALLOWED_ORIGINS=https://www.acme.example
+# Optional: accept browser events only from your own sites (see "Send events from your site").
+# COLLECT_ALLOWED_ORIGINS=https://www.acme.example
 ```
 
 Use letters and digits only for `POSTGRES_PASSWORD`: the stack puts it in a database URL.
@@ -69,8 +69,9 @@ docker compose -f compose.production.yml exec app python manage.py check --deplo
 `--wait` returns once PostgreSQL and the app pass their health checks. The app container runs
 `migrate` before gunicorn starts. It listens on `127.0.0.1:8000` only (change with `APP_PORT`),
 so nothing is public until the reverse proxy is set up. `check --deploy` should print
-`System check identified no issues (2 silenced)`; the two silenced checks are explained in
-[decisions.md](decisions.md).
+no warnings or errors (two checks are silenced, as explained in [decisions.md](decisions.md)).
+With the default `COLLECT_ALLOWED_ORIGINS` it also prints one info line, `osra.I001`, which
+says browser events are accepted from any site.
 
 ## Create the first admin
 
@@ -149,30 +150,31 @@ Load the RudderStack JavaScript SDK on your site with that write key and
 `/v1/track`, `/v1/identify`). The rules for what is accepted are in
 [contract.md](contract.md), section 3.
 
-**Allowed origins.** Browsers send an `Origin` header with cross-site requests. `/v1/` accepts
-them only from:
+**Allowed origins.** By default, `/v1/` accepts browser events from pages on any site, as
+Plausible, Umami and PostHog do (`COLLECT_ALLOWED_ORIGINS=*`). Your site works with no extra
+setting. To accept browser events only from your own sites, list their origins as scheme and
+host, comma-separated, with no path:
 
-- this server's own origin;
-- origins listed in `COLLECT_ALLOWED_ORIGINS`, as scheme and host (comma-separated, no path):
-  `https://www.acme.example,https://app.acme.example`.
+```sh
+COLLECT_ALLOWED_ORIGINS=https://www.acme.example,https://app.acme.example
+```
 
-Any other origin gets `403` on the preflight and on the POST, and nothing is stored. Requests
-without `Origin` (your backend, `curl`, a RudderStack server forwarding events) need only the
-write key. The allowlist is **not authentication**: the write key is visible in your pages'
-JavaScript, and a non-browser client can send any `Origin` header it likes. It stops other
-websites from making their visitors' browsers post events into your revenue data.
+Then a browser request from any other origin gets `403` on the preflight and on the POST, and
+nothing is stored. This server's own pages are always allowed. So are requests without an
+`Origin` header (your backend, `curl`, a RudderStack server forwarding events), which need only
+the write key.
 
-Plausible, Umami and PostHog accept browser events from any origin. We refuse them until you
-list your sites (the reasons are in [decisions.md](decisions.md)). `COLLECT_ALLOWED_ORIGINS=*`
-gives you their behavior, and `check --deploy` warns about it. The **Events** page shows the
-current list.
+Neither setting is **authentication**. The write key is visible in your pages' JavaScript,
+and a non-browser client can send any `Origin` header it likes. A list only stops other
+websites from making their visitors' browsers post events into your revenue data. The
+**Events** page shows the current setting. Reasons: [decisions.md](decisions.md).
 
 Check from the server:
 
 ```sh
 curl -si -X OPTIONS https://attribution.acme.example/v1/batch \
   -H 'Origin: https://www.acme.example' -H 'Access-Control-Request-Method: POST' | head -1
-# HTTP/2 204    (listed)       HTTP/2 403    (not listed)
+# HTTP/2 204    (allowed)      HTTP/2 403    (a list is set and this origin is not on it)
 ```
 
 ## Configuration reference
@@ -204,7 +206,7 @@ with production-like settings.
 | HSTS | `SECURE_HSTS_SECONDS` > 0 | Django `security.W004` |
 | Proxy header trusted only behind the proxy | `BEHIND_PROXY=true`, app bound to 127.0.0.1 | this guide |
 | Form posts from your domain | `CSRF_TRUSTED_ORIGINS=https://<domain>` | sign-in fails with 403 if wrong |
-| Browser events only from your sites | `COLLECT_ALLOWED_ORIGINS` lists origins, not `*` | `osra.W002` (wildcard), `osra.W006` (malformed) |
+| Browser events only from your sites (optional) | `COLLECT_ALLOWED_ORIGINS` lists origins instead of the default `*` | `osra.I001` (info: unrestricted), `osra.W006` (malformed entry) |
 | SDK demo page off | leave `COLLECT_DEMO_PAGE` unset | `osra.W003` |
 | PostgreSQL, not SQLite | the compose stack | `osra.W004` |
 | Admin accounts | strong passwords, Django's validators enforce length and common-password rules | `createsuperuser` |
@@ -272,7 +274,7 @@ The `postgres` image cannot upgrade a data directory in place.
 | `400 Bad Request` on every page | The domain is not in `ALLOWED_HOSTS` |
 | Redirect loop | The proxy does not send `X-Forwarded-Proto: https`, or `BEHIND_PROXY` is not `true` |
 | `403 CSRF verification failed` when signing in | Add `https://<domain>` to `CSRF_TRUSTED_ORIGINS` |
-| Browser console: CORS error on `/v1/batch`; response `403 Origin ... is not allowed` | Add the page's origin to `COLLECT_ALLOWED_ORIGINS` and restart the app |
+| Browser console: CORS error on `/v1/batch`; response `403 Origin ... is not allowed` | `COLLECT_ALLOWED_ORIGINS` lists origins and this page's isn't one of them. Add it, or remove the setting, and restart the app |
 | `401` from `/v1/` | Missing or wrong write key (`create_workspace <name>` prints it again) |
 | Unstyled pages | The image was built without `collectstatic`. Rebuild with `--build` |
 

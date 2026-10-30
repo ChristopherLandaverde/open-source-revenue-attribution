@@ -128,10 +128,12 @@ ATTRIBUTION_LOOKBACK_DAYS = int(_lookback) if _lookback else None
 COLLECT_MAX_BATCH = env.int("COLLECT_MAX_BATCH", default=500)
 # The SDK demo page at /events/demo/ sends synthetic events into the dataset; off unless DEBUG.
 COLLECT_DEMO_PAGE = env.bool("COLLECT_DEMO_PAGE", default=DEBUG)
-# Origins (scheme + host, e.g. https://www.acme.example) whose pages may send events to /v1/
-# from the browser. Empty (the default) refuses every cross-origin browser request; same-origin
-# pages and server-side senders (no Origin header) are unaffected. "*" allows any origin.
-COLLECT_ALLOWED_ORIGINS = env.list("COLLECT_ALLOWED_ORIGINS", default=[])
+# Which sites' pages may send events to /v1/ from the browser. "*" (the default) allows any
+# origin, as Plausible, Umami and PostHog do; write keys are public in page JS either way.
+# A comma-separated list of origins (scheme + host, e.g. https://www.acme.example) restricts
+# it, as Matomo's cors_domains does: other origins get 403. Same-origin pages and server-side
+# senders (no Origin header) are always allowed. docs/decisions.md, M5.
+COLLECT_ALLOWED_ORIGINS = env.list("COLLECT_ALLOWED_ORIGINS", default=["*"])
 
 LOGGING = {
     "version": 1,

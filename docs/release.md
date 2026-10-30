@@ -79,8 +79,9 @@ On a clean clone of the release commit, with a production-like `.env`
 - [ ] `createsuperuser` → sign in over HTTPS → session and CSRF cookies are `Secure`.
 - [ ] `load_sample_data` → the model comparison, readiness, validation, events and a journey
   page all render. Numbers match `sample_data/demo/expected/`.
-- [ ] `create_workspace` → an event POST with `Origin` set to a listed origin returns 200 with
-  `Access-Control-Allow-Origin`. An unlisted origin gets 403 on preflight and POST.
+- [ ] `create_workspace` → with the default setting, an event POST with any `Origin` returns 200
+  with `Access-Control-Allow-Origin`. With `COLLECT_ALLOWED_ORIGINS` set to a list, a listed
+  origin gets 200 and an unlisted one gets 403 on preflight and POST.
 - [ ] `pg_dump` → drop and recreate the database → `pg_restore` → row counts unchanged.
 - [ ] **Upgrade path** (from the second release on): start the previous tag, load the demo,
   back up, check out the new tag, `up -d --build --wait`. Migrations apply and the demo data

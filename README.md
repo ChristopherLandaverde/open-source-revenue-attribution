@@ -67,8 +67,8 @@ The response lists each event's outcome. Here: 16 received, 14 accepted, 1 dupli
 (`TIMESTAMP_WITHOUT_TIMEZONE`). Send it again and nothing new is stored: 15 duplicates,
 1 refused. http://127.0.0.1:8000/events/ shows the events and which became touchpoints.
 
-Browser pages on other sites can send events once their origin is in
-`COLLECT_ALLOWED_ORIGINS`; until then they get 403
+Pages on any site can send events from the browser. Set `COLLECT_ALLOWED_ORIGINS` to accept
+them only from your own sites
 ([details](docs/self-hosting.md#send-events-from-your-site)).
 With `DEBUG=true`, http://127.0.0.1:8000/events/demo/ loads the RudderStack JavaScript SDK and
 sends identify, page and track events from your browser to the same endpoint.

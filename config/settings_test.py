@@ -15,7 +15,7 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 # Tests run with the default (no lookback cap) whatever a local .env says.
 ATTRIBUTION_LOOKBACK_DAYS = None
 # Deterministic security settings whatever a local .env says.
-COLLECT_ALLOWED_ORIGINS = []
+COLLECT_ALLOWED_ORIGINS = ["*"]  # the default, whatever a local .env says
 SECURE_SSL_REDIRECT = False
 # Templates resolve {% static %} without a collectstatic manifest.
 STORAGES = {

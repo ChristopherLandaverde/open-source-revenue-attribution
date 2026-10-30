@@ -21,11 +21,12 @@ causal impact.
   admin, TLS, backups, upgrades and the security checklist.
 - **Sign-in (M5).** Every page needs a signed-in user (Django auth). The first admin is
   created with `manage.py createsuperuser`. There is no public sign-up and no default password.
-- **Allowed origins for `/v1/` (M5).** Browser events from other sites are refused with 403
-  until their origin is listed in `COLLECT_ALLOWED_ORIGINS`. Server-side senders still need
-  only the write key.
-- **Deployment checks (M5).** `manage.py check --deploy` adds `osra.W001` to `osra.W006`:
-  wildcard hosts or origins, demo page on, SQLite, HTTPS off, malformed origins.
+- **CORS for `/v1/` (M5).** Browser events are accepted from any site by default, as in
+  Plausible, Umami and PostHog. `COLLECT_ALLOWED_ORIGINS` can restrict them to a list of
+  origins; other sites then get 403. Write-key auth is unchanged.
+- **Deployment checks (M5).** `manage.py check --deploy` adds `osra.W001` and `osra.W003` to
+  `osra.W006` (wildcard hosts, demo page on, SQLite, HTTPS off, malformed origins), plus the
+  info message `osra.I001` (unrestricted origins).
   HTTPS-by-default settings apply when `DEBUG=false`.
 - **Model comparison (M4).** First-touch, last-touch, linear, position-based (40/20/40) and
   time decay (7-day half-life), side by side per campaign and per opportunity, for pipeline
@@ -61,8 +62,9 @@ start. There are no earlier releases to upgrade from.
 ### Upgrade notes
 
 None (first release). Settings added in M5 that a server must set: `SECRET_KEY`,
-`ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `BEHIND_PROXY`, `POSTGRES_PASSWORD`, and
-`COLLECT_ALLOWED_ORIGINS` if browsers send events. All are listed in `.env.example`.
+`ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `BEHIND_PROXY` and `POSTGRES_PASSWORD`. Optional:
+`COLLECT_ALLOWED_ORIGINS` to restrict browser events to your sites. All are listed in
+`.env.example`.
 
 ### Known limits
 

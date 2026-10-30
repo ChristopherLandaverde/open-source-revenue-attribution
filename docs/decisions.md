@@ -6,7 +6,8 @@ Product and data-meaning decisions, newest first. Each links the issue where it 
 
 Decided by Claude under Christopher's standing rule (adopt the industry standard or argue for
 a deviation). Research and sources: [docs/research/m5-self-hosting.md](research/m5-self-hosting.md).
-Branch `claude/m5-self-hosting`. Christopher reviews the deviations below in the PR.
+Branch `claude/m5-self-hosting`. Christopher's review (via the coordinating session,
+2026-10-29): adopt the standard for CORS; keep deviations 1 and 2 below.
 
 **Adopted from the standard** (Plausible CE, Umami, PostHog):
 - Docker Compose with the app and PostgreSQL, configured from a `.env` file.
@@ -19,27 +20,33 @@ Branch `claude/m5-self-hosting`. Christopher reviews the deviations below in the
 - Semver releases, a changelog in Keep a Changelog format (Plausible), and per-release
   migration and upgrade notes.
 - Backups with `pg_dump` / `pg_restore`. No tool documents more than this.
+- **Browser events from any origin by default** (`COLLECT_ALLOWED_ORIGINS="*"`), as Umami
+  (`*`), Plausible (CORSPlug defaults) and PostHog (mirrors any origin) do. The first draft
+  refused cross-origin events until sites were listed. That was dropped: write keys are public
+  in every page snippet, and non-browser clients send no `Origin` (or any they like), so
+  deny-by-default added setup friction without real protection. Listing origins restricts it,
+  as Matomo's `cors_domains[]` does: other origins get 403 on the preflight and the POST, and
+  nothing is stored. Same-origin pages and requests without `Origin` are always allowed.
+  `check --deploy` reports the unrestricted default as `osra.I001`, an info message that does
+  not fail `--fail-level WARNING`. `osra.W006` flags malformed list entries. The origin is
+  echoed back, never a literal `*`, and `Access-Control-Allow-Credentials` is never sent.
 
 **Deviations:**
-1. **Cross-origin browser events are refused until `COLLECT_ALLOWED_ORIGINS` lists the site.**
-   Umami (`*`), Plausible (CORSPlug defaults) and PostHog (mirrors any origin) accept browser
-   events from any origin. Only Matomo allowlists. Why we differ: B2B customers have a handful
-   of domains, so the list is cheap to set, and a revenue report is hurt more by junk touches
-   than a traffic counter is. The list is not authentication: the write key is public in
-   browser JS. `COLLECT_ALLOWED_ORIGINS=*` restores the standard behavior, and
-   `check --deploy` warns about it (`osra.W002`). The events page shows the current list, and
-   `osra.W006` flags malformed entries, which softens the first-run friction the research
-   warned about. `Access-Control-Allow-Credentials` is never sent. *Christopher: confirm or
-   switch the default to `*`.*
-2. **The first admin is created with `manage.py createsuperuser`, not on first visit.**
+1. **The first admin is created with `manage.py createsuperuser`, not on first visit (kept).**
    Plausible, PostHog and Matomo give the instance to whoever visits first, and Umami ships
-   `admin`/`umami`. A CLI step has no race window and no default password. Django's
-   `createsuperuser --noinput` with `DJANGO_SUPERUSER_PASSWORD` covers scripted installs.
-3. **HSTS `includeSubDomains` and `preload` stay off, and their `check --deploy` reminders
+   `admin`/`umami`. With first-visitor setup, whoever reaches a freshly exposed instance first
+   owns it, including a scanner that gets there before the operator. A default password has
+   the same flaw for as long as nobody changes it. `createsuperuser` is Django's normal way to
+   bootstrap an admin: it runs only with shell access to the server, has no race window and
+   no default password. `createsuperuser --noinput` with `DJANGO_SUPERUSER_PASSWORD` covers
+   scripted installs.
+2. **HSTS `includeSubDomains` and `preload` stay off, and their `check --deploy` reminders
    (`security.W005`, `security.W021`) are silenced.** Both commit the whole parent domain to
    HTTPS, which an app on `attribution.example.com` must not decide for `example.com`. The
    operator can opt in with `SECURE_HSTS_INCLUDE_SUBDOMAINS` / `SECURE_HSTS_PRELOAD`.
-   `SECURE_HSTS_SECONDS` defaults to 0; the guide says to start at 3600.
+   `SECURE_HSTS_SECONDS` defaults to 0; the guide says to start at 3600. Kept because these are
+   Django's own safe defaults and HSTS mistakes are hard to undo: browsers cache the policy
+   for its max-age, and preload-list removal takes months.
 
 **Also decided:** every page needs a signed-in user (Django's `LoginRequiredMiddleware`). Only
 `/v1/`, the sign-in page and `/healthz` are open. All signed-in users see all data: no roles

@@ -5,7 +5,7 @@ add the settings that are specific to running this app on a public server.
 """
 
 from django.conf import settings
-from django.core.checks import Tags, Warning, register
+from django.core.checks import Info, Tags, Warning, register
 
 
 @register(Tags.security, deploy=True)
@@ -20,12 +20,15 @@ def deployment_checks(app_configs, **kwargs):
             )
         )
     if "*" in settings.COLLECT_ALLOWED_ORIGINS:
+        # Info, not Warning: allowing any origin is the default and the industry standard
+        # (docs/decisions.md, M5), so `check --deploy --fail-level WARNING` still passes.
         issues.append(
-            Warning(
-                "COLLECT_ALLOWED_ORIGINS contains '*': any website can send events to /v1/ "
-                "with a write key it copies from your pages.",
-                hint="List the origins of the sites you track, e.g. https://www.acme.example.",
-                id="osra.W002",
+            Info(
+                "COLLECT_ALLOWED_ORIGINS is unrestricted ('*', the default): pages on any "
+                "website can send events to /v1/ with a write key copied from your pages.",
+                hint="To restrict it, list your sites' origins, e.g. "
+                "COLLECT_ALLOWED_ORIGINS=https://www.acme.example.",
+                id="osra.I001",
             )
         )
     if settings.COLLECT_DEMO_PAGE:

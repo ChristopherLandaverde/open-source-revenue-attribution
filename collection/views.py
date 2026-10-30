@@ -61,7 +61,7 @@ CORS_MAX_AGE = "86400"
 
 
 def _origin_allowed(request, origin: str) -> bool:
-    """Same-origin pages always; other origins only when listed in COLLECT_ALLOWED_ORIGINS."""
+    """Same-origin pages always; others when COLLECT_ALLOWED_ORIGINS is "*" or lists them."""
     if origin == request.build_absolute_uri("/").rstrip("/"):
         return True
     allowed = settings.COLLECT_ALLOWED_ORIGINS
@@ -85,12 +85,12 @@ def _error(status: int, message: str, **headers) -> JsonResponse:
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
 def collect(request, kind: str):
-    """RudderStack HTTP API. Write-key auth; browsers on other origins need an allowlist entry.
+    """RudderStack HTTP API, authenticated by the write key.
 
-    A browser request carries an Origin header. Unless that origin is this server's own or is
-    listed in COLLECT_ALLOWED_ORIGINS, the preflight gets no CORS headers and the POST is
-    refused with 403 before anything is stored. Requests without Origin (servers, curl) are
-    authenticated by the write key alone.
+    Any origin may send by default (COLLECT_ALLOWED_ORIGINS="*"). When the setting lists
+    origins, a browser request whose Origin is neither this server's own nor listed gets 403
+    on the preflight and the POST, before anything is stored. Requests without Origin
+    (servers, curl) are authenticated by the write key alone.
     """
     if kind != "batch" and kind not in SINGLE_EVENT_PATHS:
         raise Http404("Unknown collection endpoint.")
@@ -185,6 +185,7 @@ def events(request):
         "recent": recent,
         "refused": refused,
         "demo_enabled": settings.COLLECT_DEMO_PAGE,
+        "any_origin": "*" in settings.COLLECT_ALLOWED_ORIGINS,
         "allowed_origins": [o for o in settings.COLLECT_ALLOWED_ORIGINS if o],
     }
     return render(request, "collection/events.html", context)
