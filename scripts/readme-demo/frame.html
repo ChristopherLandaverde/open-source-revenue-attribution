@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OSRA README demo frame</title>
+<style>
+  /* The app's own vendored fonts (static/css/tokens.css). */
+  @font-face { font-family: "DM Sans"; src: url("../../static/vendor/fonts/dm-sans-5.1.0-latin-wght.woff2") format("woff2"); font-weight: 100 1000; }
+  @font-face { font-family: "IBM Plex Mono"; src: url("../../static/vendor/fonts/ibm-plex-mono-5.1.0-latin-400.woff2") format("woff2"); font-weight: 400; }
+  @font-face { font-family: "IBM Plex Mono"; src: url("../../static/vendor/fonts/ibm-plex-mono-5.1.0-latin-500.woff2") format("woff2"); font-weight: 500 600; }
+  :root {
+    /* Stage: --ink-primary from static/css/tokens.css, the same tile as docs/media/logo.svg. */
+    --stage: #10231F;
+    --on-stage: #F3F0E6;          /* --surface-paper */
+    --on-stage-muted: #BFCCC5;    /* paper mixed into the stage, 10.0:1 on --stage */
+    --pick: #D7FF69;              /* --state-verified, the logo's line */
+    /* Paper cards: tokens.css values. */
+    --paper: #F3F0E6;
+    --raised: #EBE8DE;
+    --ink: #10231F;
+    --ink-2: #426B5D;
+    --line: rgba(16, 35, 31, 0.22);
+    --exception: #B83A2D;
+    --verified: #D7FF69;
+    --observed: #8CBFFF;
+    --sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 880px; height: 640px; background: var(--stage); overflow: hidden; }
+  body { font-family: var(--sans); color: var(--on-stage); -webkit-font-smoothing: antialiased; }
+  .stage { width: 880px; height: 640px; padding: 20px 20px 20px; display: flex; flex-direction: column; gap: 14px; }
+
+  .stage > * { flex-shrink: 0; }
+  .top { display: flex; align-items: baseline; gap: 14px; min-height: 30px; }
+  .step { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--pick); white-space: nowrap; letter-spacing: 0.04em; }
+  .headline { font-size: 19px; font-weight: 600; line-height: 1.3; }
+  .headline code, .note code { font-family: var(--mono); font-size: 0.9em; color: var(--pick); font-weight: 500; }
+
+  .row { display: flex; gap: 18px; align-items: flex-start; }
+  .grow { flex: 1; min-width: 0; }
+
+  .card { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; color: var(--ink); }
+  .card-head { background: var(--raised); border-bottom: 1px solid var(--line); padding: 6px 12px; font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-head b { color: var(--ink); font-weight: 600; letter-spacing: 0.06em; }
+  .shot { display: block; width: 100%; }
+
+  pre.csv { font-family: var(--mono); font-size: 11.5px; line-height: 1.75; padding: 8px 0; color: var(--ink); }
+  pre.csv span.l { display: block; padding: 0 12px; white-space: pre; }
+  pre.csv span.n { display: inline-block; width: 22px; color: var(--ink-2); }
+  pre.csv span.hdr { color: var(--ink-2); }
+  pre.csv span.gap { color: var(--ink-2); }
+  pre.csv span.a { background: rgba(215, 255, 105, 0.55); box-shadow: inset 3px 0 0 var(--ink); }
+  pre.csv span.b { background: rgba(140, 191, 255, 0.40); box-shadow: inset 3px 0 0 var(--ink); }
+  pre.csv span.bad { background: rgba(184, 58, 45, 0.12); box-shadow: inset 3px 0 0 var(--exception); }
+  pre.csv em { font-style: normal; font-weight: 600; }
+  pre.csv span.bad em { color: var(--exception); }
+  .card-foot { border-top: 1px solid var(--line); padding: 6px 12px; font-size: 12px; color: var(--ink-2); line-height: 1.45; }
+  .key { display: inline-block; width: 10px; height: 10px; border: 1px solid var(--ink); vertical-align: -1px; margin-right: 4px; }
+  .key.a { background: var(--verified); } .key.b { background: var(--observed); }
+
+  .note { font-size: 15px; line-height: 1.5; color: var(--on-stage-muted); }
+  .note b { color: var(--pick); font-weight: 600; font-family: var(--mono); font-size: 0.95em; }
+  .note strong { color: var(--on-stage); font-weight: 600; }
+
+  .vs { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .vs .card { padding: 10px 14px 12px; }
+  .vs .campaign { font-family: var(--mono); font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+  .vs .nums { display: flex; gap: 24px; }
+  .vs .label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-2); }
+  .vs .num { font-family: var(--mono); font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .vs .zero { color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div class="stage" id="stage"></div>
+</body>
+</html>

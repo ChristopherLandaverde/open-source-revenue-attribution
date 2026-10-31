@@ -13,6 +13,18 @@ does. How releases are made: [docs/release.md](docs/release.md).
 - **README.** Leads with the problem and a verified number from the demo data, with a proof
   GIF recorded from the running app. Event sending, the model table and the code layout moved
   to [docs/how-it-works.md](docs/how-it-works.md).
+- **README hero and demo.** Centered hero with a logo (`docs/media/logo.svg`), a verified stats
+  line and accent badges. The proof GIF is now a four-frame storyboard built from the running
+  app by `scripts/readme-demo/`.
+
+### Fixed
+
+- **Events page copy.** One touchpoint reads "1 became a touchpoint", not "1 became
+  touchpoint" (found in the v0.1.0 browser walkthrough,
+  [docs/reviews/2026-10-30-v0.1.0-walkthrough.md](docs/reviews/2026-10-30-v0.1.0-walkthrough.md)).
+- **`TOUCHPOINT_OUTSIDE_LOOKBACK` message.** Reads "of the opportunities of contact
+  'con-nw-raj'" instead of "of contact 'con-nw-raj''s opportunities" (same walkthrough). The
+  code and when it fires are unchanged.
 
 ## [0.1.0] - Unreleased (not tagged)
 
