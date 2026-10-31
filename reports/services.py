@@ -1,6 +1,6 @@
 """Glue between Django records and the pure attribution package."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from functools import partial
 
@@ -11,7 +11,7 @@ import attribution
 from collection.services import convert_events
 from contracts import CURRENCY_MINOR_UNITS, RejectReason, WarningCode
 from contracts.touchpoints import TouchReason
-from reports.fixes import FIXES
+from reports.fixes import FIXES, HUBSPOT_FIXES
 from reports.models import ImportRun, Opportunity, Touchpoint
 
 METRICS = {
@@ -98,6 +98,8 @@ class ValidationView:
     issues: list[dict]
     codes: list[tuple[str, str, str]]  # (code, meaning, how to fix) for every code present
     totals: dict[str, int]
+    notes: list[str] = field(default_factory=list)  # from the importer, e.g. HubSpot
+    from_hubspot: bool = False
 
 
 def validation_view(show: str = "rejected") -> ValidationView:
@@ -128,13 +130,17 @@ def validation_view(show: str = "rejected") -> ValidationView:
         "file_errors": len(report["file_errors"]),
         "warnings": len(warnings),
     }
+    from_hubspot = run.source.startswith("HubSpot")
+    fixes = {**FIXES, **HUBSPOT_FIXES} if from_hubspot else FIXES
     return ValidationView(
         run=run,
         show=show,
         file_rows=file_rows,
-        issues=[{**i, "fix": FIXES[i["code"]]} for i in issues],
-        codes=[(code, descriptions[code], FIXES[code]) for code in sorted(present)],
+        issues=[{**i, "fix": fixes[i["code"]]} for i in issues],
+        codes=[(code, descriptions[code], fixes[code]) for code in sorted(present)],
         totals=totals,
+        notes=list(report.get("notes", [])),
+        from_hubspot=from_hubspot,
     )
 
 

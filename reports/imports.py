@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from django.conf import settings
 from django.db import transaction
 
+from attribution import describe_window
 from collection.services import sync_event_touchpoints
 from contracts import ImportBatch, ImportReport, validate_import
 from reports.models import Account, Contact, ImportRun, Opportunity, Touchpoint
@@ -22,12 +23,16 @@ class ImportResult:
         return len(self.report.rejected) + len(self.report.file_errors)
 
 
-def run_import(batch: ImportBatch, source: str, strict: bool = False) -> ImportResult:
+def run_import(
+    batch: ImportBatch, source: str, strict: bool = False, notes: list[str] | None = None
+) -> ImportResult:
     """Validate the batch, record an ImportRun, and load accepted rows.
 
     Partial by default: accepted rows load, refused rows are listed in the report. With
     `strict`, any refused row or file refuses the whole import and nothing loads.
     Re-importing the same rows updates them by ID, so a reload changes nothing.
+    `notes` (from a connector such as the HubSpot import) are stored with the report and shown
+    on the validation page.
     """
     lookback = settings.ATTRIBUTION_LOOKBACK_DAYS
     report = validate_import(batch, lookback_days=lookback)
@@ -42,7 +47,7 @@ def run_import(batch: ImportBatch, source: str, strict: bool = False) -> ImportR
             lookback_days=lookback,
             strict=strict,
             loaded=loaded,
-            report=report.to_dict(),
+            report={**report.to_dict(), **({"notes": list(notes)} if notes else {})},
         )
     return ImportResult(run, report)
 
@@ -91,3 +96,28 @@ def _load(report: ImportReport) -> None:
                 "referrer": rec.referrer,
             },
         )
+
+
+def describe_report(command, report: ImportReport, source: str) -> None:
+    """Print a validation report from a management command: totals, file errors, refused rows."""
+    counts = report.counts.values()
+    received = sum(c["received"] for c in counts)
+    accepted = sum(c["accepted"] for c in counts)
+    duplicates = sum(c["duplicates"] for c in counts)
+    command.stdout.write(
+        f"Validated {source} ({describe_window(report.lookback_days)}): {received} rows, "
+        f"{accepted} accepted, {len(report.rejected)} refused, {duplicates} exact "
+        f"duplicates ignored, {len(report.warnings)} warnings."
+    )
+    if report.file_errors:
+        command.stderr.write(command.style.ERROR("File errors (file refused):"))
+        for issue in report.file_errors:
+            command.stderr.write(f"  {issue.file}: {issue.code} {issue.field} - {issue.message}")
+    if report.rejected:
+        command.stderr.write(command.style.WARNING("Refused rows (not loaded):"))
+        for row in report.rejected:
+            for issue in row.issues:
+                command.stderr.write(
+                    f"  {issue.file} row {issue.row} [{row.record_id or 'no id'}]: "
+                    f"{issue.code} {issue.field} - {issue.message}"
+                )

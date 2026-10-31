@@ -117,6 +117,76 @@ links their earlier page views to the contact.
 
 Not affiliated with RudderStack.
 
+## Live import from HubSpot
+
+`import_hubspot` reads companies, contacts and deals from HubSpot's CRM API, read-only, and
+imports them as accounts, contacts and opportunities. The rows go through the same validation
+and load as the CSV import, so a HubSpot record is refused for the same reasons, with the same
+reason codes on `/validation/`. **Fixture-verified; not yet run against a real HubSpot portal.**
+
+```sh
+export HUBSPOT_TOKEN=<service key or private app access token>
+uv run python manage.py import_hubspot --dry-run    # read and validate; writes nothing
+uv run python manage.py import_hubspot              # read, validate and load
+```
+
+- **Token.** Create a HubSpot service key (Settings → Integrations → Service Keys), or use an
+  existing legacy private app token. Since 2026-10-26, HubSpot no longer lets you create new
+  legacy private apps. Grant only the read scopes `crm.objects.companies.read`,
+  `crm.objects.contacts.read` and `crm.objects.deals.read`. The command reads the token from
+  `HUBSPOT_TOKEN` on the machine that runs it. It never logs, stores or prints the token.
+- **What leaves the machine:** GET requests to `api.hubapi.com` only:
+  - the CRM v3 object lists;
+  - CRM v4 association lists, for a record with more associations than fit in one response;
+  - the portal's account details (`/account-info/2026-09/details`), only when a deal has no
+    currency.
+
+  There are no write requests, and redirects are not followed. A test fails on any other
+  request.
+- **Mapping.**
+  - A company becomes an account.
+  - A contact becomes a contact on its primary company.
+  - A deal becomes an opportunity on its primary company. It takes **one contact: the earliest
+    created contact of that company** (then the lowest ID). If all of a deal's contacts belong
+    to other companies, the deal loads with no contact, so its full amount is Unattributed.
+  - `amount` is used as stored, in `deal_currency_code`. If a deal has no currency, the
+    portal's company currency is used, or `--currency` if you give it.
+  - The deal's create date (`hs_createdate`) is the pipeline conversion. The close date is used
+    as `won_at` only for a closed-won deal.
+  - Record IDs are HubSpot's.
+
+  Details and sources: [docs/decisions.md](docs/decisions.md).
+- **Closed-lost deals aren't supported yet** ([#22](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/22)).
+  A deal that is closed-lost on its first import is refused (`INVALID_STAGE`) and is not in any
+  report. A deal that was loaded as open or won and is **later** closed-lost keeps its last
+  imported stage, so it **still counts as open pipeline** (or won revenue). The import names
+  these deals in its output and on `/validation/`, and deletes nothing.
+- **Touches don't come from HubSpot.** Send events ([above](#send-events)) and `identify` with the
+  HubSpot contact ID, or pass `--touchpoints touchpoints.csv` whose `contact_id` values are
+  HubSpot contact IDs.
+- **Options:** `--currency USD` overrides the currency for deals that have none. `--strict`
+  refuses the whole import if any row fails.
+
+Output of `--dry-run` on the synthetic test fixtures (`tests/fixtures/hubspot/portal.json`, HubSpot's
+documented response shapes, equivalent to the demo CSVs). This is not a real portal:
+
+```console
+$ uv run python manage.py import_hubspot --dry-run
+Read 4 companies, 8 contacts and 9 deals from api.hubapi.com in 3 GET requests.
+  1 deals have contacts only at other companies; they load with no contact, so their full amount is Unattributed.
+Rows are numbered in the order HubSpot returned them; the ID in brackets is the HubSpot record ID.
+Validated HubSpot (api.hubapi.com) (No lookback cap: every touch up to the conversion): 21 rows, 18 accepted, 3 refused, 0 exact duplicates ignored, 2 warnings.
+Refused rows (not loaded):
+  contacts.csv row 9 [7099]: UNKNOWN_ACCOUNT account_id - '5099' is not an accepted account.
+  opportunities.csv row 8 [9107]: AMOUNT_PRECISION amount - 1500.5 has more decimal places than JPY allows.
+  opportunities.csv row 9 [9108]: WON_AT_REQUIRED won_at - A won opportunity needs won_at.
+Dry run: would load 4 accounts, 7 contacts, 7 opportunities, 0 touchpoints. Nothing was written.
+```
+
+A test imports these fixtures plus the demo touchpoints, and separately the demo CSVs with the
+same IDs. The two give identical records, validation outcomes and API numbers. In the CSV,
+deal 9109's contact is left blank, because that is how the HubSpot import loads it.
+
 ## Use it from an agent / API
 
 Read-only JSON endpoints return what the report pages show, computed by the same functions, so
@@ -358,6 +428,7 @@ with the API's own response on a live test server.
 | Area | What you get | Status |
 |---|---|---|
 | CSV import and validation | Import page or `load_sample_data`; 21 refusal and 8 warning codes; every refused row listed with its fix on `/validation/` | Works |
+| HubSpot import | `import_hubspot`: companies, contacts and deals read-only through the same validation; `--dry-run`. Fixture-verified; not yet run against a real portal | Works (fixture-verified) |
 | Event collection | RudderStack-compatible `/v1/batch`, `/page`, `/track`, `/identify` with a write key; deduplicated; sessions become touchpoints | Works |
 | Opportunity journey | Each touch of the opportunity's contact, its eligibility and the reason, and each model's credit | Works |
 | Model comparison | 5 rule-based models per campaign and per opportunity, plus an overlapping Influenced column; pipeline and won revenue; optional lookback window | Works |
@@ -394,6 +465,11 @@ Details for every row: [docs/how-it-works.md](docs/how-it-works.md).
   does not combine them into an account journey yet.
 - **API tokens read everything.** A token acts as its user, who sees all data (there are no
   roles); tokens have no scopes or expiry. Revoke one by deleting it in the admin.
+- **HubSpot import is fixture-verified only** and reads every record on each run (no
+  incremental sync, no deletes). Closed-lost deals are refused, and a deal loaded earlier that
+  turns closed-lost still counts with its last imported stage
+  ([#22](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/22)).
+  A deal credits one of its contacts.
 - **Stages are `open` and `won` only**; mixed currencies are reported side by side, never summed.
 - **Not yet run on a public domain.** The self-hosted stack was run end to end on 2026-10-29
   behind Caddy with a local certificate; a Let's Encrypt deployment is untested.

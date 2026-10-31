@@ -125,6 +125,32 @@ dataset your real data goes in, and there is no command to remove them again. Tr
 throwaway stack, then wipe it with `docker compose -f compose.production.yml down -v` (deletes
 the database volume) before importing real data.
 
+### Import from HubSpot
+
+`import_hubspot` reads companies, contacts and deals with a read-only HubSpot token and loads
+them through the same validation as the CSV import
+([README](../README.md#live-import-from-hubspot)).
+On the Docker stack, pass the token for the one command instead of saving it in `.env`.
+`-e HUBSPOT_TOKEN` with no value copies it from your shell, so it doesn't appear on the
+command line:
+
+```sh
+read -rs HUBSPOT_TOKEN && export HUBSPOT_TOKEN      # paste the token; it is not echoed
+docker compose -f compose.production.yml exec -e HUBSPOT_TOKEN app \
+  python manage.py import_hubspot --dry-run
+docker compose -f compose.production.yml exec -e HUBSPOT_TOKEN app \
+  python manage.py import_hubspot
+```
+
+The app container needs outbound HTTPS to `api.hubapi.com`, and nothing else is contacted.
+A deal with no currency uses the portal's company currency (`--currency USD` overrides it).
+Grant the token only `crm.objects.companies.read`, `crm.objects.contacts.read` and
+`crm.objects.deals.read`. Re-running it updates records by their HubSpot IDs and never deletes
+any. A deal loaded earlier that is now closed-lost keeps its last stage, and the import lists
+it ([#22](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/22)).
+The import is fixture-verified and has not yet been run against a real portal or on the Docker
+stack.
+
 ## Reverse proxy and TLS
 
 Bring your own proxy, as with Umami and Matomo. Plausible also documents this route. The proxy

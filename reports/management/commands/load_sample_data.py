@@ -11,9 +11,8 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from attribution import describe_window
-from contracts import ImportBatch, ImportReport
-from reports.imports import run_import
+from contracts import ImportBatch
+from reports.imports import describe_report, run_import
 
 DEFAULT_PATH = Path(settings.BASE_DIR) / "sample_data" / "demo"
 
@@ -46,7 +45,7 @@ class Command(BaseCommand):
         source = display_path(path)
         result = run_import(ImportBatch.from_csv_dir(path), source=source, strict=strict)
         report = result.report
-        self._describe(report, source)
+        describe_report(self, report, source)
         if not result.run.loaded:
             raise CommandError(
                 f"Refused the whole import (--strict): {result.refused} rows or files "
@@ -60,26 +59,3 @@ class Command(BaseCommand):
                 f"from {source}. Full validation report: /validation/"
             )
         )
-
-    def _describe(self, report: ImportReport, source: str) -> None:
-        counts = report.counts.values()
-        received = sum(c["received"] for c in counts)
-        accepted = sum(c["accepted"] for c in counts)
-        duplicates = sum(c["duplicates"] for c in counts)
-        self.stdout.write(
-            f"Validated {source} ({describe_window(report.lookback_days)}): {received} rows, "
-            f"{accepted} accepted, {len(report.rejected)} refused, {duplicates} exact "
-            f"duplicates ignored, {len(report.warnings)} warnings."
-        )
-        if report.file_errors:
-            self.stderr.write(self.style.ERROR("File errors (file refused):"))
-            for issue in report.file_errors:
-                self.stderr.write(f"  {issue.file}: {issue.code} {issue.field} - {issue.message}")
-        if report.rejected:
-            self.stderr.write(self.style.WARNING("Refused rows (not loaded):"))
-            for row in report.rejected:
-                for issue in row.issues:
-                    self.stderr.write(
-                        f"  {issue.file} row {issue.row} [{row.record_id or 'no id'}]: "
-                        f"{issue.code} {issue.field} - {issue.message}"
-                    )

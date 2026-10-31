@@ -1,0 +1,614 @@
+{
+ "_comment": "SYNTHETIC. Hand-written HubSpot CRM v3 list records (GET /crm/v3/objects/<type>, documented shape: id, properties, createdAt, updatedAt, archived, associations{<type>:{results:[{id,type}]}}) equivalent to sample_data/demo/*.csv. No real portal data. ID map in tests/test_hubspot_import.py.",
+ "companies": [
+  {
+   "id": "5001",
+   "properties": {
+    "name": "Northwind Logistics",
+    "domain": "northwind.example",
+    "hs_object_id": "5001"
+   },
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false
+  },
+  {
+   "id": "5002",
+   "properties": {
+    "name": "Umbra Health",
+    "domain": "umbra.example",
+    "hs_object_id": "5002"
+   },
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false
+  },
+  {
+   "id": "5003",
+   "properties": {
+    "name": "Kestrel Bank",
+    "domain": "kestrel.example",
+    "hs_object_id": "5003"
+   },
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false
+  },
+  {
+   "id": "5004",
+   "properties": {
+    "name": "Sakura Robotics",
+    "domain": "sakura.example",
+    "hs_object_id": "5004"
+   },
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false
+  }
+ ],
+ "contacts": [
+  {
+   "id": "7001",
+   "properties": {
+    "email": "ana@northwind.example",
+    "createdate": "2026-01-10T10:00:00.000Z",
+    "hs_object_id": "7001"
+   },
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5001",
+       "type": "contact_to_company"
+      },
+      {
+       "id": "5001",
+       "type": "contact_to_company_unlabeled"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "7002",
+   "properties": {
+    "email": "raj@northwind.example",
+    "createdate": "2026-01-11T10:00:00.000Z",
+    "hs_object_id": "7002"
+   },
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5001",
+       "type": "contact_to_company"
+      },
+      {
+       "id": "5001",
+       "type": "contact_to_company_unlabeled"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "7003",
+   "properties": {
+    "email": "li@northwind.example",
+    "createdate": "2026-01-12T10:00:00.000Z",
+    "hs_object_id": "7003"
+   },
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5001",
+       "type": "contact_to_company"
+      },
+      {
+       "id": "5001",
+       "type": "contact_to_company_unlabeled"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "7004",
+   "properties": {
+    "email": "eve@umbra.example",
+    "createdate": "2026-01-13T10:00:00.000Z",
+    "hs_object_id": "7004"
+   },
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5002",
+       "type": "contact_to_company"
+      },
+      {
+       "id": "5002",
+       "type": "contact_to_company_unlabeled"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "7005",
+   "properties": {
+    "email": "sam@umbra.example",
+    "createdate": "2026-01-14T10:00:00.000Z",
+    "hs_object_id": "7005"
+   },
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5002",
+       "type": "contact_to_company"
+      },
+      {
+       "id": "5002",
+       "type": "contact_to_company_unlabeled"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "7006",
+   "properties": {
+    "email": "otto@kestrel.example",
+    "createdate": "2026-01-15T10:00:00.000Z",
+    "hs_object_id": "7006"
+   },
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5003",
+       "type": "contact_to_company"
+      },
+      {
+       "id": "5003",
+       "type": "contact_to_company_unlabeled"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "7007",
+   "properties": {
+    "email": "yui@sakura.example",
+    "createdate": "2026-01-16T10:00:00.000Z",
+    "hs_object_id": "7007"
+   },
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5004",
+       "type": "contact_to_company"
+      },
+      {
+       "id": "5004",
+       "type": "contact_to_company_unlabeled"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "7099",
+   "properties": {
+    "email": "ghost@missing.example",
+    "createdate": "2026-01-17T10:00:00.000Z",
+    "hs_object_id": "7099"
+   },
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5099",
+       "type": "contact_to_company"
+      },
+      {
+       "id": "5099",
+       "type": "contact_to_company_unlabeled"
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "deals": [
+  {
+   "id": "9101",
+   "properties": {
+    "dealname": "Northwind platform",
+    "amount": "24000",
+    "deal_currency_code": "USD",
+    "pipeline": "default",
+    "dealstage": "closedwon",
+    "hs_createdate": "2026-04-01T12:00:00.000Z",
+    "createdate": "2026-04-01T12:00:00.000Z",
+    "closedate": "2026-06-15T12:00:00.000Z",
+    "hs_is_closed_won": "true",
+    "hs_is_closed_lost": "false",
+    "hs_object_id": "9101"
+   },
+   "createdAt": "2026-04-01T12:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5001",
+       "type": "deal_to_company"
+      },
+      {
+       "id": "5001",
+       "type": "deal_to_company_unlabeled"
+      }
+     ]
+    },
+    "contacts": {
+     "results": [
+      {
+       "id": "7001",
+       "type": "deal_to_contact"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "9102",
+   "properties": {
+    "dealname": "Northwind expansion",
+    "amount": "6000",
+    "deal_currency_code": "USD",
+    "pipeline": "default",
+    "dealstage": "appointmentscheduled",
+    "hs_createdate": "2026-05-20T12:00:00.000Z",
+    "createdate": "2026-05-20T12:00:00.000Z",
+    "closedate": "2026-09-30T12:00:00.000Z",
+    "hs_is_closed_won": "false",
+    "hs_is_closed_lost": "false",
+    "hs_object_id": "9102"
+   },
+   "createdAt": "2026-05-20T12:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5001",
+       "type": "deal_to_company"
+      },
+      {
+       "id": "5001",
+       "type": "deal_to_company_unlabeled"
+      }
+     ]
+    },
+    "contacts": {
+     "results": [
+      {
+       "id": "7002",
+       "type": "deal_to_contact"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "9103",
+   "properties": {
+    "dealname": "Umbra pilot",
+    "amount": "15000",
+    "deal_currency_code": "USD",
+    "pipeline": "default",
+    "dealstage": "closedwon",
+    "hs_createdate": "2026-03-10T09:00:00.000Z",
+    "createdate": "2026-03-10T09:00:00.000Z",
+    "closedate": "2026-05-01T09:00:00.000Z",
+    "hs_is_closed_won": "true",
+    "hs_is_closed_lost": "false",
+    "hs_object_id": "9103"
+   },
+   "createdAt": "2026-03-10T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5002",
+       "type": "deal_to_company"
+      },
+      {
+       "id": "5002",
+       "type": "deal_to_company_unlabeled"
+      }
+     ]
+    },
+    "contacts": {
+     "results": [
+      {
+       "id": "7004",
+       "type": "deal_to_contact"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "9104",
+   "properties": {
+    "dealname": "Umbra renewal",
+    "amount": "9000",
+    "deal_currency_code": "USD",
+    "pipeline": "default",
+    "dealstage": "appointmentscheduled",
+    "hs_createdate": "2026-06-01T09:00:00.000Z",
+    "createdate": "2026-06-01T09:00:00.000Z",
+    "closedate": "2026-09-30T12:00:00.000Z",
+    "hs_is_closed_won": "false",
+    "hs_is_closed_lost": "false",
+    "hs_object_id": "9104"
+   },
+   "createdAt": "2026-06-01T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5002",
+       "type": "deal_to_company"
+      },
+      {
+       "id": "5002",
+       "type": "deal_to_company_unlabeled"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "9105",
+   "properties": {
+    "dealname": "Kestrel core banking",
+    "amount": "18500.50",
+    "deal_currency_code": "EUR",
+    "pipeline": "default",
+    "dealstage": "closedwon",
+    "hs_createdate": "2026-04-20T10:00:00.000Z",
+    "createdate": "2026-04-20T10:00:00.000Z",
+    "closedate": "2026-07-01T10:00:00.000Z",
+    "hs_is_closed_won": "true",
+    "hs_is_closed_lost": "false",
+    "hs_object_id": "9105"
+   },
+   "createdAt": "2026-04-20T10:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5003",
+       "type": "deal_to_company"
+      },
+      {
+       "id": "5003",
+       "type": "deal_to_company_unlabeled"
+      }
+     ]
+    },
+    "contacts": {
+     "results": [
+      {
+       "id": "7006",
+       "type": "deal_to_contact"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "9106",
+   "properties": {
+    "dealname": "Sakura line automation",
+    "amount": "1200000",
+    "deal_currency_code": "JPY",
+    "pipeline": "default",
+    "dealstage": "appointmentscheduled",
+    "hs_createdate": "2026-05-04T15:00:00.000Z",
+    "createdate": "2026-05-04T15:00:00.000Z",
+    "closedate": "2026-09-30T12:00:00.000Z",
+    "hs_is_closed_won": "false",
+    "hs_is_closed_lost": "false",
+    "hs_object_id": "9106"
+   },
+   "createdAt": "2026-05-04T15:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5004",
+       "type": "deal_to_company"
+      },
+      {
+       "id": "5004",
+       "type": "deal_to_company_unlabeled"
+      }
+     ]
+    },
+    "contacts": {
+     "results": [
+      {
+       "id": "7007",
+       "type": "deal_to_contact"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "9107",
+   "properties": {
+    "dealname": "Sakura spare parts",
+    "amount": "1500.5",
+    "deal_currency_code": "JPY",
+    "pipeline": "default",
+    "dealstage": "appointmentscheduled",
+    "hs_createdate": "2026-05-10T00:00:00.000Z",
+    "createdate": "2026-05-10T00:00:00.000Z",
+    "closedate": "2026-09-30T12:00:00.000Z",
+    "hs_is_closed_won": "false",
+    "hs_is_closed_lost": "false",
+    "hs_object_id": "9107"
+   },
+   "createdAt": "2026-05-10T00:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5004",
+       "type": "deal_to_company"
+      },
+      {
+       "id": "5004",
+       "type": "deal_to_company_unlabeled"
+      }
+     ]
+    },
+    "contacts": {
+     "results": [
+      {
+       "id": "7007",
+       "type": "deal_to_contact"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "9108",
+   "properties": {
+    "dealname": "Kestrel add-on",
+    "amount": "4000",
+    "deal_currency_code": "EUR",
+    "pipeline": "default",
+    "dealstage": "closedwon",
+    "hs_createdate": "2026-05-01T09:00:00.000Z",
+    "createdate": "2026-05-01T09:00:00.000Z",
+    "closedate": null,
+    "hs_is_closed_won": "true",
+    "hs_is_closed_lost": "false",
+    "hs_object_id": "9108"
+   },
+   "createdAt": "2026-05-01T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5003",
+       "type": "deal_to_company"
+      },
+      {
+       "id": "5003",
+       "type": "deal_to_company_unlabeled"
+      }
+     ]
+    },
+    "contacts": {
+     "results": [
+      {
+       "id": "7006",
+       "type": "deal_to_contact"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "9109",
+   "properties": {
+    "dealname": "Mismatched deal",
+    "amount": "7000",
+    "deal_currency_code": "USD",
+    "pipeline": "default",
+    "dealstage": "appointmentscheduled",
+    "hs_createdate": "2026-04-15T09:00:00.000Z",
+    "createdate": "2026-04-15T09:00:00.000Z",
+    "closedate": "2026-09-30T12:00:00.000Z",
+    "hs_is_closed_won": "false",
+    "hs_is_closed_lost": "false",
+    "hs_object_id": "9109"
+   },
+   "createdAt": "2026-04-15T09:00:00.000Z",
+   "updatedAt": "2026-07-01T00:00:00.000Z",
+   "archived": false,
+   "associations": {
+    "companies": {
+     "results": [
+      {
+       "id": "5001",
+       "type": "deal_to_company"
+      },
+      {
+       "id": "5001",
+       "type": "deal_to_company_unlabeled"
+      }
+     ]
+    },
+    "contacts": {
+     "results": [
+      {
+       "id": "7005",
+       "type": "deal_to_contact"
+      }
+     ]
+    }
+   }
+  }
+ ]
+}
