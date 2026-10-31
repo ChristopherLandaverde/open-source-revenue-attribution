@@ -56,9 +56,14 @@ no React/Vite) · Django ORM + migrations on PostgreSQL · pytest + pytest-djang
 - **Data:** synthetic only (`*.example` domains). Never commit `.env` or real personal data.
 - **Changing attribution math or report meaning** needs a `needs-decision` issue first.
 - **Auth:** `LoginRequiredMiddleware` protects every view. Only `/v1/` (write-key auth), the
-  sign-in page and `/healthz` are `@login_not_required`; don't add another without a reason
-  in the PR. Page tests use the signed-in `client` fixture (`tests/conftest.py`);
-  `anon_client` is for unauthenticated checks.
+  sign-in page, `/healthz` and `/api/v1/` are `@login_not_required`; don't add another without
+  a reason in the PR. `/api/v1/` views use `api.views.api_endpoint`, which checks a Bearer
+  token (`manage.py createapitoken`) or a session itself and answers a JSON 401, never data.
+  Page tests use the signed-in `client` fixture (`tests/conftest.py`); `anon_client` is for
+  unauthenticated checks.
+- **API:** `/api/v1/` is read-only (GET and HEAD; other methods 405) and only reshapes what
+  the `reports` functions return for the matching page; a test compares each endpoint with its
+  page's context. Changing a field's name or meaning bumps `schemaVersion`.
 - **Settings:** every new environment setting goes in `.env.example` (a test enforces it) and,
   if it matters on a server, in `docs/self-hosting.md`.
 - **Changelog:** user-visible changes add a line under `## [Unreleased]` in `CHANGELOG.md`.

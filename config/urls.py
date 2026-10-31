@@ -23,6 +23,7 @@ urlpatterns = [
     ),
     path("accounts/logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("healthz", healthz, name="healthz"),
+    path("api/v1/", include("api.urls")),
     path("", include("collection.urls")),
     path("", include("reports.urls")),
 ]

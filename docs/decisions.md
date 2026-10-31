@@ -2,6 +2,45 @@
 
 Product and data-meaning decisions, newest first. Each links the issue where it was made.
 
+## 2026-10-31 — Read-only JSON API and its auth (L1)
+
+Decided by Claude under the standing rule (adopt the industry standard or argue a deviation)
+and the portfolio's live-API defaults (read-only, nothing published). Branch
+`claude/read-only-json-api`.
+
+**Adopted from the standard:**
+- **Per-user API key sent as `Authorization: Bearer <key>`**, as Plausible's Stats API
+  ("sending the key in the Authorization header", keys created in account settings and
+  "shown once") and PostHog's personal API keys (Bearer header; stored hashed; not viewable
+  after creation) do. Dreamdata's public surface for reading data is an MCP server with
+  OAuth 2.1, which needs an authorization server; that is out of scope for a self-hosted
+  Django app with no new dependency. Its ingestion API uses Basic auth with a source key,
+  which we already mirror on `/v1/`.
+- **Stored as a SHA-256 hash, shown once** (PostHog). Tokens are 256-bit random values with an
+  `osra_` prefix, so a fast hash is safe; a slow password hash would add nothing.
+- **Version in the path** (`/api/v1/`, like Plausible's `/api/v2/query`), plus
+  `schemaVersion: "1"` in every body so a saved response says which schema it follows.
+- **Read-only.** GET and HEAD (RFC 9110) only; other methods get 405 with `Allow: GET, HEAD`.
+  Responses are `Cache-Control: no-store, private`. No CORS headers: the API is for servers
+  and agents, not other sites' pages, and `/v1/` CORS is unchanged. A token's `last_used_at`
+  is its only write, at most once a minute and only for a request that passed validation.
+
+**Deviations:**
+1. **Tokens come from a management command, not a settings page.** `manage.py createapitoken
+   <username>` follows `createsuperuser` and `create_workspace`: it needs shell access to the
+   server, and no page can leak a token. The admin lists tokens (prefix, last use) and deletes
+   them; it cannot create or show one.
+2. **No scopes or expiry yet.** Plausible and PostHog scope keys; here every signed-in user
+   already sees all data and the API cannot write, so a scope would not narrow anything. Add
+   scopes with roles.
+3. **No date filters.** Plausible's query takes a date range; the report pages have none, and
+   the API must return the pages' numbers. Unknown parameters (`start`, `end`) get a 400 that
+   says so instead of being ignored.
+
+A signed-in browser session also authenticates (the same login as the pages). A request with
+an `Authorization: Bearer` header is judged on the token alone: a wrong token is a 401 even
+with a session. Other `Authorization` schemes are ignored, and the session decides.
+
 ## 2026-10-30 — Accept bare event arrays on `/v1/batch` (#16)
 
 Decision A, chosen by Christopher: accept both `{"batch": [...]}` and a bare JSON array on
