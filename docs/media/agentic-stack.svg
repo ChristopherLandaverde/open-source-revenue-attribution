@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="880" height="620" viewBox="0 0 880 620" role="img" aria-labelledby="title desc">
   <title id="title">Open Source Revenue Attribution agentic stack</title>
-  <desc id="desc">Four stacked layers. 1 Engine, level L0: 5 attribution models, journey joins and 7 readiness checks in pure Python, fed by CSV import, events and a read-only HubSpot import (L3, fixture-verified). 2 Tools, levels L1 and L2: a read-only JSON API with Bearer tokens and the osra-mcp server with get_attribution, get_journey and get_readiness. 3 Your agent, L2: Claude, Cursor or any MCP client on your machine, calling your own self-hosted instance. 4 You approve: no write tools; nothing writes, findings are evidence for you to act on, and imports are commands a person runs.</desc>
+  <desc id="desc">Four stacked layers. 1 Engine, the base layer: 5 attribution models, journey joins and 7 readiness checks in pure Python, fed by CSV import, events and a read-only HubSpot import (L3, fixture-verified). 2 Tools, levels L1 and L2: a read-only JSON API with Bearer tokens and the osra-mcp server with get_attribution, get_journey and get_readiness. 3 Your agent, L2: Claude, Cursor or any MCP client on your machine, calling your own self-hosted instance. 4 You approve: no write tools; nothing writes, findings are evidence for you to act on, and imports are commands a person runs.</desc>
   <!-- Focosys tokens (static/css/tokens.css): paper #F3F0E6, raised #EBE8DE, ink #10231F,
        ink-secondary #426B5D, verified lime #D7FF69 (fill only on paper; text only on ink). -->
   <style>
@@ -24,8 +24,8 @@
   <!-- 1 Engine -->
   <rect x="32" y="60" width="816" height="112" rx="14" fill="#EBE8DE" stroke="#10231F" stroke-opacity="0.22"/>
   <text x="56" y="98" class="sans name" fill="#10231F">1  Engine</text>
-  <rect x="56" y="114" width="38" height="24" rx="6" fill="#D7FF69" stroke="#10231F" stroke-opacity="0.35"/>
-  <text x="75" y="131" class="mono chip" fill="#10231F" text-anchor="middle">L0</text>
+  <rect x="56" y="114" width="52" height="24" rx="6" fill="#F3F0E6" stroke="#10231F" stroke-width="1.5"/>
+  <text x="82" y="131" class="mono chip" fill="#10231F" text-anchor="middle">base</text>
   <text x="232" y="94" class="sans lead" fill="#10231F">5 attribution models · journey joins · 7 readiness checks</text>
   <text x="232" y="120" class="mono code" fill="#426B5D">pure Python: attribution/ · contracts/ · owns every number</text>
   <text x="232" y="146" class="mono code" fill="#426B5D">in: CSV · events (/v1/) · HubSpot read-only import</text>

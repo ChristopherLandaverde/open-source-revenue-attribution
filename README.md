@@ -45,7 +45,7 @@ shows association under a named rule and window, not causal impact or incrementa
 ## Agentic
 
 <p align="center">
-  <img src="docs/media/agentic-stack.svg" width="880" alt="The agentic stack in four layers. 1 Engine (L0): 5 attribution models, journey joins and 7 readiness checks in pure Python, fed by CSV import, events and a read-only HubSpot import (L3, fixture-verified). 2 Tools (L1, L2): a read-only JSON API with Bearer tokens and the osra-mcp server with get_attribution, get_journey and get_readiness. 3 Your agent (L2): Claude, Cursor or any MCP client on your machine, calling your own self-hosted instance. 4 You approve: no write tools; findings are evidence for you to act on.">
+  <img src="docs/media/agentic-stack.svg" width="880" alt="The agentic stack in four layers. 1 Engine (the base layer): 5 attribution models, journey joins and 7 readiness checks in pure Python, fed by CSV import, events and a read-only HubSpot import (L3, fixture-verified). 2 Tools (L1, L2): a read-only JSON API with Bearer tokens and the osra-mcp server with get_attribution, get_journey and get_readiness. 3 Your agent (L2): Claude, Cursor or any MCP client on your machine, calling your own self-hosted instance. 4 You approve: no write tools; findings are evidence for you to act on.">
 </p>
 
 The engine computes every number; your agent only quotes it, under the named model and window.
@@ -58,9 +58,9 @@ The engine computes every number; your agent only quotes it, under the named mod
 | "Why does `q1-search` get nothing for opp-101 under last-touch?" | `get_journey` | Each touch of the opportunity's contact, its eligibility and why, each model's credit | nothing |
 | "Can I trust these numbers yet? What should I fix first?" | `get_readiness` | The 7 data checks: status, count, finding, fix, affected records | nothing |
 
-AGENTIC.md level: L1 machine-readable (JSON API) · L2 agent-callable (`osra-mcp`) · L3 live read
-(HubSpot import, fixture-verified: tested against synthetic HubSpot API responses, not yet a real
-portal). Details: [Use it from an agent / API](#use-it-from-an-agent--api) ·
+Agentic levels: L1 machine-readable · L2 agent-callable · L3 live read · L4 proposes changes
+for you to approve. OSRA: L1 (JSON API) · L2 (`osra-mcp`) · L3 (HubSpot import, fixture-verified:
+tested against synthetic HubSpot API responses, not yet a real portal). Details: [Use it from an agent / API](#use-it-from-an-agent--api) ·
 [MCP server](#from-an-agent-over-mcp) · [Live import from HubSpot](#live-import-from-hubspot).
 
 ## Quick start
