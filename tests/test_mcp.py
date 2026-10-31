@@ -166,6 +166,9 @@ async def test_invalid_token_is_the_apis_401(osra):
         ({"OSRA_URL": "ftp://osra.example", "OSRA_TOKEN": "osra_x"}, "invalid_url"),
         ({"OSRA_URL": "https://u:p@osra.example", "OSRA_TOKEN": "osra_x"}, "invalid_url"),
         ({"OSRA_URL": "https://osra.example/?x=1", "OSRA_TOKEN": "osra_x"}, "invalid_url"),
+        ({"OSRA_URL": "http://osra.example", "OSRA_TOKEN": "osra_x"}, "insecure_url"),
+        ({"OSRA_URL": "http://10.0.0.5:8000", "OSRA_TOKEN": "osra_x"}, "insecure_url"),
+        ({"OSRA_URL": "http://localhost.evil.example", "OSRA_TOKEN": "osra_x"}, "insecure_url"),
     ],
 )
 async def test_missing_settings_are_structured_errors_without_a_request(env, code):
@@ -186,6 +189,27 @@ async def test_reads_os_environ_by_default(osra, monkeypatch):
         found = await client.call_tool("get_readiness", {})
     assert payload(missing)["error"]["code"] == "missing_token"
     assert found.is_error is False and payload(found)["verdict"] == "fix_data_first"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000/",
+        "http://[::1]:8000",
+        "https://osra.example",
+    ],
+)
+async def test_plain_http_is_allowed_only_for_this_machine(url):
+    sent = []
+
+    def respond(request):
+        sent.append(request)
+        return httpx2.Response(200, json={"schemaVersion": "1"})
+
+    env = {"OSRA_URL": url, "OSRA_TOKEN": "osra_tok"}
+    result = await call(env, "get_readiness", transport=httpx2.MockTransport(respond))
+    assert result.is_error is False and len(sent) == 1
 
 
 # --- Network: only GET requests to OSRA_URL's /api/v1/ --------------------------------
@@ -231,7 +255,7 @@ async def test_redirects_are_not_followed(osra):
         sent.append(request)
         return httpx2.Response(301, headers={"Location": "https://elsewhere.example/"})
 
-    env = {"OSRA_URL": "http://attribution.example.com", "OSRA_TOKEN": "osra_tok"}
+    env = {"OSRA_URL": "https://attribution.example.com", "OSRA_TOKEN": "osra_tok"}
     result = await call(env, "get_readiness", transport=httpx2.MockTransport(respond))
     assert len(sent) == 1
     error = payload(result)["error"]

@@ -68,3 +68,17 @@ jobs:
         run: uv sync --locked --python 3.12
       - name: Tests (PostgreSQL 17)
         run: uv run pytest
+
+  docker:
+    # The production image must build from the locked dependencies (no dev or mcp groups).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the production image
+        run: docker build --tag osra:ci .
+      - name: No MCP packages in the image
+        run: |
+          docker run --rm --entrypoint python osra:ci -c "
+          import importlib.util, sys
+          found = [m for m in ('mcp', 'osra_mcp', 'httpx2') if importlib.util.find_spec(m)]
+          sys.exit(f'unexpected in the image: {found}' if found else 0)"

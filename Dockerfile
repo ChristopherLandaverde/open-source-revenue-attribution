@@ -17,6 +17,9 @@ WORKDIR /app
 
 # Dependencies first, so code changes don't reinstall them.
 COPY pyproject.toml uv.lock .python-version ./
+# uv reads the MCP server's metadata (a path source in pyproject.toml) to check the lock; the
+# image does not install it (it is in the `mcp` group, outside --no-dev).
+COPY mcp-server/pyproject.toml mcp-server/
 RUN uv sync --locked --no-dev --no-install-project
 
 COPY . .

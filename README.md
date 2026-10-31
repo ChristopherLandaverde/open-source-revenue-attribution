@@ -253,7 +253,8 @@ GET to the API above with your token, and it returns the API's JSON unchanged:
 sentence, and the server tells the agent to quote OSRA's numbers rather than compute its own, to
 name the model and window, and to describe credit as association, never causal impact. A
 missing or wrong token comes back as a tool error (`missing_token`, or the API's
-`not_authenticated`) with no data.
+`not_authenticated`) with no data. `OSRA_URL` must be `https://`, except on this machine
+(`http://localhost`, `127.0.0.1` or `[::1]`), so the token never crosses a network unencrypted.
 
 **What goes where.** The server sends requests only to `OSRA_URL`, with your token in the
 `Authorization` header. It never logs the token or puts it in a result. Through MCP, the
@@ -313,7 +314,7 @@ left out, and the values shown are unchanged.
 {"schemaVersion": "1",
  "window": {"lookbackDays": null, "description": "No lookback cap: every touch up to the conversion"},
  "models": [{"id": "linear", "name": "Linear", ...}],
- "currencies": [{"currency": "USD", "total": "54000.00", "unattributed": "9000.00",
+ "currencies": [..., {"currency": "USD", "total": "54000.00", "unattributed": "9000.00",
    "rows": [{"campaignKey": "google / cpc / q1-search", "attributed": {"linear": "19500.00"},
              "influenced": {"amount": "39000.00", "opportunities": 2}}, ...]}, ...]}
 

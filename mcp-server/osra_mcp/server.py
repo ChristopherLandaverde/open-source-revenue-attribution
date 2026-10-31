@@ -52,6 +52,7 @@ INSTRUCTIONS = (
 # The import contract's ID rule (docs/contract.md section 1), minus the path segments . and ..
 ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,64}")
 TIMEOUT = httpx2.Timeout(30.0, connect=10.0)
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 USER_AGENT = f"osra-mcp/{__version__}"
 
 Metric = Annotated[
@@ -105,6 +106,13 @@ def _base_url(env: Mapping[str, str]) -> str:
     parts = urlsplit(raw)
     if parts.scheme not in ("http", "https") or not parts.hostname:
         raise _Refused("invalid_url", "OSRA_URL must be an http:// or https:// URL with a host.")
+    if parts.scheme == "http" and parts.hostname not in LOOPBACK_HOSTS:
+        # The token travels in a header: plain HTTP is only for this machine.
+        raise _Refused(
+            "insecure_url",
+            "OSRA_URL must use https:// unless it is this machine (localhost, 127.0.0.1 or "
+            "[::1]); the token would otherwise cross the network unencrypted.",
+        )
     if parts.username or parts.password or parts.query or parts.fragment:
         raise _Refused(
             "invalid_url",
