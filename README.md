@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  5 named models side by side · 7 data-readiness checks · 21 reason codes for refused rows · self-hostable with Docker Compose and PostgreSQL 17
+  5 named models side by side · 7 data-readiness checks · RudderStack-compatible event collection · self-hostable with Docker Compose and PostgreSQL 17
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick start</a> · <a href="#what-you-get">What you get</a> · <a href="#known-limits">Known limits</a> · <a href="docs/how-it-works.md">How it works</a> · <a href="docs/self-hosting.md">Self-hosting</a> · <a href="docs/contract.md">Data contract</a>
+  <a href="#quick-start">Quick start</a> · <a href="#send-events">Send events</a> · <a href="#what-you-get">What you get</a> · <a href="#known-limits">Known limits</a> · <a href="docs/how-it-works.md">How it works</a> · <a href="docs/self-hosting.md">Self-hosting</a> · <a href="docs/contract.md">Data contract</a>
 </p>
 
 Open Source Revenue Attribution is a self-hostable app for B2B marketers, founders and RevOps
@@ -66,8 +66,8 @@ its journey, then **Data readiness** in the top bar: 3 checks need a fix on the 
 with how to verify it.
 
 To load your own data, use **Import CSV** with the four files described in the
-[data contract](docs/contract.md#2-csv-import-files). To send RudderStack events to `/v1/`, see
-[Send events](docs/how-it-works.md#send-events).
+[data contract](docs/contract.md#2-csv-import-files). To collect events from your site, see
+[Send events](#send-events).
 
 <details>
 <summary>Local Postgres with Docker</summary>
@@ -83,6 +83,39 @@ uv run python manage.py migrate
 
 To run it on a server (Docker Compose with PostgreSQL 17 behind your own TLS proxy), follow the
 [self-hosting guide](docs/self-hosting.md).
+
+## Send events
+
+The collection endpoint is RudderStack-compatible: it takes page, track and identify events from
+the RudderStack JavaScript SDK on `/v1/`, authenticated by a write key from
+`manage.py create_workspace`. Load the SDK (3.35.0, the version vendored in `static/vendor/`)
+with your server as its data plane URL:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@rudderstack/analytics-js@3.35.0/dist/npm/modern/bundled/umd/index.js"></script>
+<script>
+  const osra = new window.rudderanalytics.RudderAnalytics();
+  osra.load("<write key>", "https://attribution.acme.example", {
+    // This server is not a RudderStack control plane: give the SDK its source config here.
+    getSourceConfig: () => ({
+      source: { id: "osra", name: "OSRA", enabled: true, config: {}, destinations: [] },
+    }),
+  });
+  osra.page();
+</script>
+```
+
+Keep `getSourceConfig`: without it the SDK asks RudderStack's servers for its configuration and
+sends nothing. Call `osra.identify("<contact_id>")` when a visitor becomes a known contact; that
+links their earlier page views to the contact.
+
+- **Already on RudderStack?** Forward events with a Webhook destination instead of a second SDK:
+  [steps](docs/self-hosting.md#forward-from-an-existing-rudderstack-setup). Tested against
+  RudderStack's documented payloads, not yet from a live RudderStack workspace.
+- **Try it locally** with `curl` and the bundled synthetic events:
+  [docs/how-it-works.md](docs/how-it-works.md#send-events).
+
+Not affiliated with RudderStack.
 
 ## What you get
 
@@ -133,6 +166,9 @@ Details for every row: [docs/how-it-works.md](docs/how-it-works.md).
   contacts links to neither. Rules: [contract §3](docs/contract.md#from-events-to-touchpoints).
 - **Touchpoints are recomputed from all events** on every collection request; fine for demo
   volumes, not tuned for large ones.
+- **RudderStack forwarding is one event per request.** The HTTP Webhook destination's batching
+  sends a bare JSON array, which `/v1/batch` doesn't accept yet
+  ([#16](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/16)).
 - **Journeys are per opportunity contact.** The page lists the account's other contacts but
   does not combine them into an account journey yet.
 - **Stages are `open` and `won` only**; mixed currencies are reported side by side, never summed.

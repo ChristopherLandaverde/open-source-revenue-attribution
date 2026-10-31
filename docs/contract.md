@@ -115,7 +115,8 @@ account journey with drill-down (PRD) is not built yet.
 
 ## 3. Events (RudderStack)
 
-Events arrive from the RudderStack JavaScript SDK (`static/vendor/`) or any client that speaks
+Events arrive from the RudderStack JavaScript SDK (`static/vendor/`), from a RudderStack
+Webhook destination that forwards them one at a time, or from any client that speaks
 RudderStack's HTTP API (see [Collection](#collection-endpoint)). This section fixes what an
 event must carry to be accepted. Field names are RudderStack's.
 
@@ -169,7 +170,7 @@ event must carry to be accepted. Field names are RudderStack's.
 | Auth | `Authorization: Basic base64(<write key>:)`, as the SDK sends it. A write key belongs to a workspace (`manage.py create_workspace`). Write keys are visible in browser code; they identify the sender, they are not secrets. |
 | Response | `200` with counts and one outcome per event in order: `accepted`, `duplicate` or `rejected`, with its codes. `401` missing or unknown key, `400` body is not a JSON object/batch, `413` too many events. Refused events still get `200`: the SDK does not retry 4xx, and a refused event will not become valid by retrying. |
 | Storage | Every distinct payload is stored verbatim with its outcome (`collection.CollectedEvent`). Accepted events are unique by `messageId`; refused payloads by content. Exact repeats increment a counter, so replaying the same data never adds rows. |
-| Scope | All workspaces write to one dataset (no per-workspace isolation), and `messageId` is unique across it. Same-origin only: no CORS headers yet. |
+| Scope | All workspaces write to one dataset (no per-workspace isolation), and `messageId` is unique across it. Pages on other sites may send from the browser (CORS); `COLLECT_ALLOWED_ORIGINS` can limit them to listed origins ([self-hosting](self-hosting.md#send-events-from-your-site)). |
 
 ### From events to touchpoints
 

@@ -72,6 +72,12 @@ them only from your own sites ([details](self-hosting.md#send-events-from-your-s
 With `DEBUG=true`, http://127.0.0.1:8000/events/demo/ loads the RudderStack JavaScript SDK and
 sends identify, page and track events from your browser to the same endpoint.
 
+On your own site, load the SDK with this server as its data plane URL and a local
+`getSourceConfig` ([snippet](self-hosting.md#send-events-from-your-site)). If you already run
+RudderStack, forward events with a Webhook destination
+([steps](self-hosting.md#forward-from-an-existing-rudderstack-setup)). Research and sources:
+[research/rudderstack-forwarding.md](research/rudderstack-forwarding.md).
+
 ## Code layout
 
 | Path | What |

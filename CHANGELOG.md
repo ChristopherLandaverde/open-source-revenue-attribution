@@ -17,8 +17,20 @@ does. How releases are made: [docs/release.md](docs/release.md).
   line and accent badges. The proof GIF is now a four-frame storyboard built from the running
   app by `scripts/readme-demo/`.
 
+- **Sending events is easier to find.** The README has a "Send events" section with the
+  RudderStack JavaScript SDK snippet, and the self-hosting guide explains how to forward events
+  from an existing RudderStack setup with a Webhook destination. Research and sources:
+  [docs/research/rudderstack-forwarding.md](docs/research/rudderstack-forwarding.md).
+
 ### Fixed
 
+- **RudderStack SDK from another site.** The `/v1/` preflight now allows every header the
+  browser asks for, as rudder-server does. Before, SDK 3.35.0's `SentAt` and retry headers were
+  refused, so the browser blocked events from pages on other origins. Same-origin pages, such
+  as the SDK demo page, were not affected. `COLLECT_ALLOWED_ORIGINS` and write-key auth are
+  unchanged.
+- **SDK setup in the self-hosting guide.** It now says to pass `getSourceConfig`. Without it
+  the SDK fetches its configuration from `api.rudderstack.com`, fails, and sends nothing.
 - **Events page copy.** One touchpoint reads "1 became a touchpoint", not "1 became
   touchpoint" (found in the v0.1.0 browser walkthrough,
   [docs/reviews/2026-10-30-v0.1.0-walkthrough.md](docs/reviews/2026-10-30-v0.1.0-walkthrough.md)).
