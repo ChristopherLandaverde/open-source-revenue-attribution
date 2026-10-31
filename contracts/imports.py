@@ -570,11 +570,11 @@ def _warn_unreachable_touchpoints(report: ImportReport) -> None:
         if not times:
             message = f"Contact {tp.contact_id!r} has no opportunities."
         elif report.lookback_days is None:
-            message = f"After every conversion of contact {tp.contact_id!r}'s opportunities."
+            message = f"After every conversion of the opportunities of contact {tp.contact_id!r}."
         else:
             message = (
-                f"Outside every {report.lookback_days}-day lookback window of contact "
-                f"{tp.contact_id!r}'s opportunities."
+                f"Outside every {report.lookback_days}-day lookback window of the opportunities "
+                f"of contact {tp.contact_id!r}."
             )
         report.warnings.append(
             Issue(
