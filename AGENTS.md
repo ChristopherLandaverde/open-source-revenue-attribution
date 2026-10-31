@@ -61,6 +61,10 @@ no React/Vite) · Django ORM + migrations on PostgreSQL · pytest + pytest-djang
   token (`manage.py createapitoken`) or a session itself and answers a JSON 401, never data.
   Page tests use the signed-in `client` fixture (`tests/conftest.py`); `anon_client` is for
   unauthenticated checks.
+- **MCP server:** `mcp-server/osra_mcp` (entry point `osra-mcp`, dependency group `mcp`) is a
+  client of `/api/v1/` only: it imports no Django or app code (`tests/test_architecture.py`),
+  returns the API's JSON unchanged, and sends requests only to `OSRA_URL`. `mcp` is pinned
+  exactly; upgrade it on purpose. New tools are read-only and go through the API.
 - **API:** `/api/v1/` is read-only (GET and HEAD; other methods 405) and only reshapes what
   the `reports` functions return for the matching page; a test compares each endpoint with its
   page's context. Changing a field's name or meaning bumps `schemaVersion`.

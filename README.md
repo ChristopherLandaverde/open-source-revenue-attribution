@@ -235,7 +235,108 @@ Without a valid token or session the API answers `401` with
 `{"schemaVersion": "1", "error": {"code": "not_authenticated", …}}` and no data. Any method
 other than GET or HEAD gets `405`.
 Amounts are strings at the currency's minor unit (`"1200000"` for
-JPY), and times are ISO 8601 in UTC. There is no MCP server yet; it is the next step.
+JPY), and times are ISO 8601 in UTC.
+
+### From an agent over MCP
+
+`osra-mcp` is a local stdio MCP server in [`mcp-server/`](mcp-server/). Your agent (Claude
+Code, Claude Desktop, Cursor) starts it on your machine. It has three read-only tools, each one
+GET to the API above with your token, and it returns the API's JSON unchanged:
+
+| Tool | API call |
+|---|---|
+| `get_attribution(metric?, model?)` | `GET /api/v1/attribution` |
+| `get_journey(id, metric?, model?)` | `GET /api/v1/journeys/<id>` |
+| `get_readiness(metric?)` | `GET /api/v1/readiness` |
+
+`metric` is `pipeline` (the default) or `won`. Each tool description carries the API's `meaning`
+sentence, and the server tells the agent to quote OSRA's numbers rather than compute its own, to
+name the model and window, and to describe credit as association, never causal impact. A
+missing or wrong token comes back as a tool error (`missing_token`, or the API's
+`not_authenticated`) with no data.
+
+**What goes where.** The server sends requests only to `OSRA_URL`, with your token in the
+`Authorization` header. It never logs the token or puts it in a result. Through MCP, the
+results (your attribution numbers, opportunity and account names, contact IDs) also reach the
+model behind your own agent, under that agent's terms. OSRA itself calls no LLM.
+
+Install it from a clone (`uv sync` installs the `mcp` dependency group, which the Docker image
+leaves out). Then point your agent at `.venv/bin/osra-mcp`, with `OSRA_URL` and `OSRA_TOKEN`
+set to your instance and a token from `createapitoken`. The server is not published on PyPI or
+in an MCP registry.
+
+```sh
+git clone https://github.com/ChristopherLandaverde/open-source-revenue-attribution.git
+cd open-source-revenue-attribution && uv sync
+```
+
+Claude Code:
+
+```sh
+claude mcp add osra -e OSRA_URL=https://attribution.example.com -e OSRA_TOKEN=osra_… \
+  -- /path/to/open-source-revenue-attribution/.venv/bin/osra-mcp
+```
+
+Claude Desktop (`claude_desktop_config.json`) and Cursor (`~/.cursor/mcp.json` or
+`.cursor/mcp.json`) take the same entry:
+
+```json
+{
+  "mcpServers": {
+    "osra": {
+      "command": "/path/to/open-source-revenue-attribution/.venv/bin/osra-mcp",
+      "env": { "OSRA_URL": "https://attribution.example.com", "OSRA_TOKEN": "osra_…" }
+    }
+  }
+}
+```
+
+The `claude mcp add` line above was run in this repo's development session; the Claude Desktop
+and Cursor entries are the standard `mcpServers` format and were not run in those apps.
+
+**Transcript.** This is a real run on 2026-10-31 on the bundled sample data (`load_sample_data`
+on a throwaway local database, served by `runserver`). An MCP client started the installed
+`osra-mcp` over stdio, as an agent would. JSON is trimmed by hand: fields and list items are
+left out, and the values shown are unchanged.
+
+```text
+> initialize      < server osra 0.1.0, protocol 2025-11-25
+> tools/list      < get_attribution, get_journey, get_readiness (all readOnlyHint=true)
+
+> tools/call get_readiness {}
+< isError=false
+{"schemaVersion": "1", "verdict": "fix_data_first", "opportunities": 6, "attributable": 5,
+ "noEligibleTouch": ["opp-104"], ...}
+
+> tools/call get_attribution {"model": "linear"}
+< isError=false
+{"schemaVersion": "1",
+ "window": {"lookbackDays": null, "description": "No lookback cap: every touch up to the conversion"},
+ "models": [{"id": "linear", "name": "Linear", ...}],
+ "currencies": [{"currency": "USD", "total": "54000.00", "unattributed": "9000.00",
+   "rows": [{"campaignKey": "google / cpc / q1-search", "attributed": {"linear": "19500.00"},
+             "influenced": {"amount": "39000.00", "opportunities": 2}}, ...]}, ...]}
+
+> tools/call get_journey {"id": "opp-101"}
+< isError=false
+{"schemaVersion": "1", "subject": {"type": "opportunity", "id": "opp-101"},
+ "journeys": [{"opportunity": {"id": "opp-101", "amount": "24000.00", "currency": "USD", ...},
+   "conversionAt": "2026-04-01T12:00:00Z", "eligibleTouches": 2,
+   "touches": [
+     {"touchpointId": "tp-01", "campaignKey": "google / cpc / q1-search", "status": "eligible",
+      "credits": {"first-touch": "24000.00", "linear": "12000.00", "time-decay": "2265.76", ...}},
+     {"touchpointId": "tp-02", "campaignKey": "linkedin / paid-social / abm-launch", "status": "eligible",
+      "credits": {"last-touch": "24000.00", "linear": "12000.00", "time-decay": "21734.24", ...}},
+     {"touchpointId": "tp-03", "campaignKey": "partner / referral / may-webinar", "status": "after",
+      "credits": {"first-touch": null, ...}}]}]}
+
+> tools/call get_readiness {}        (OSRA_TOKEN=osra_wrong)
+< isError=true
+{"schemaVersion": "1", "error": {"code": "not_authenticated", "message": "Send Authorization: Bearer <token> (create one with `manage.py createapitoken <username>`), or sign in."}}
+```
+
+Each result's text is the API's response body, unchanged; `tests/test_mcp.py` compares every tool's result
+with the API's own response on a live test server.
 
 ## What you get
 
@@ -261,10 +362,10 @@ JPY), and times are ISO 8601 in UTC. There is no MCP server yet; it is the next 
 | Model comparison | 5 rule-based models per campaign and per opportunity, plus an overlapping Influenced column; pipeline and won revenue; optional lookback window | Works |
 | Data readiness | 7 checks with denominators, fixes and affected records; "Not checked" when there is no data | Works |
 | Read-only JSON API | `/api/v1/attribution`, `/journeys/<id>`, `/readiness` with a per-user Bearer token; same numbers as the pages. An account ID returns each opportunity's contact journey, not combined | Works |
+| MCP server | `osra-mcp`, a local stdio server with 3 read-only tools over the JSON API, run from a clone (not published) | Works |
 | Sign-in and self-hosting | Every page behind sign-in; Docker image and `compose.production.yml` with PostgreSQL 17 | Works |
 | Account journey (all contacts combined), stage history | | Planned |
 | W-shaped model (needs a lead milestone in the contract) | | Planned |
-| MCP server over the JSON API | | Planned |
 | Release | v0.1.0 prepared in [CHANGELOG.md](CHANGELOG.md) | Prepared, not tagged |
 
 Details for every row: [docs/how-it-works.md](docs/how-it-works.md).
