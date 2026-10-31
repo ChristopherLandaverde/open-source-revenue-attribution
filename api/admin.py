@@ -9,7 +9,8 @@ class ApiTokenAdmin(admin.ModelAdmin):
     shows the plaintext once; the admin never sees it."""
 
     list_display = ["name", "prefix", "user", "created_at", "last_used_at"]
-    readonly_fields = ["user", "name", "prefix", "token_hash", "created_at", "last_used_at"]
+    readonly_fields = ["user", "name", "prefix", "created_at", "last_used_at"]
+    exclude = ["token_hash"]
 
     def has_add_permission(self, request):
         return False

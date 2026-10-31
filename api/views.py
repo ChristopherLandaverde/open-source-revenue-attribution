@@ -10,7 +10,7 @@ without a session gets a JSON 401 instead of a redirect to the sign-in page; `ap
 enforces authentication itself, before anything is read.
 """
 
-from datetime import UTC
+from datetime import UTC, timedelta
 from functools import wraps
 
 from django.conf import settings
@@ -24,6 +24,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 import attribution
 from api.models import ApiToken, hash_token
+from collection.services import convert_events
 from reports.models import Account, Opportunity
 from reports.readiness import readiness as readiness_view
 from reports.services import METRICS, comparison_report, journey_view
@@ -68,22 +69,33 @@ def _error(status: int, code: str, message: str, **headers) -> JsonResponse:
     return _json({"error": {"code": code, "message": message}}, status, **headers)
 
 
-def _token_user(request):
-    """The user of a valid Bearer token; None when the header is missing or wrong."""
+TOUCH_INTERVAL = timedelta(seconds=60)  # last_used_at is refreshed at most once a minute
+
+
+def _bearer_token(request) -> str | None:
+    """The token of an `Authorization: Bearer` header ("" when empty); None for no Bearer."""
     scheme, _, token = request.headers.get("Authorization", "").partition(" ")
-    if scheme.lower() != "bearer" or not token.strip():
+    return token.strip() if scheme.lower() == "bearer" else None
+
+
+def _token_record(token: str) -> ApiToken | None:
+    """The valid token record, or None for an unknown token or an inactive user."""
+    if not token:
         return None
-    record = (
-        ApiToken.objects.select_related("user").filter(token_hash=hash_token(token.strip())).first()
-    )
+    record = ApiToken.objects.select_related("user").filter(token_hash=hash_token(token)).first()
     if record is None or not record.user.is_active:
         return None
-    ApiToken.objects.filter(pk=record.pk).update(last_used_at=timezone.now())
-    return record.user
+    return record
+
+
+def _mark_used(record: ApiToken) -> None:
+    now = timezone.now()
+    if record.last_used_at is None or now - record.last_used_at > TOUCH_INTERVAL:
+        ApiToken.objects.filter(pk=record.pk).update(last_used_at=now)
 
 
 def api_endpoint(*params: str):
-    """GET-only, authenticated JSON endpoint accepting only the named query parameters."""
+    """GET/HEAD-only, authenticated JSON endpoint accepting only the named query parameters."""
 
     def decorate(view):
         # csrf_exempt: nothing here writes, and a write method must reach the 405 below
@@ -92,8 +104,11 @@ def api_endpoint(*params: str):
         @csrf_exempt
         @wraps(view)
         def wrapped(request, *args, **kwargs):
-            if "Authorization" in request.headers:
-                user = _token_user(request)  # a sent token must be valid, session or not
+            token, record = _bearer_token(request), None
+            if token is not None:
+                # A Bearer token must be valid, session or not.
+                record = _token_record(token)
+                user = record.user if record else None
             else:
                 user = request.user if request.user.is_authenticated else None
             if user is None:
@@ -105,9 +120,12 @@ def api_endpoint(*params: str):
                     **{"WWW-Authenticate": 'Bearer realm="osra"'},
                 )
             request.user = user
-            if request.method != "GET":
+            if request.method not in ("GET", "HEAD"):  # HEAD: RFC 9110 section 9.3.2
                 return _error(
-                    405, "method_not_allowed", "This API is read-only: use GET.", Allow="GET"
+                    405,
+                    "method_not_allowed",
+                    "This API is read-only: use GET.",
+                    Allow="GET, HEAD",
                 )
             unknown = sorted(set(request.GET) - set(params))
             if unknown:
@@ -123,6 +141,8 @@ def api_endpoint(*params: str):
                 return _error(
                     400, "unknown_metric", f"Unknown metric. Use one of: {', '.join(METRICS)}."
                 )
+            if record is not None:
+                _mark_used(record)
             return view(request, metric, *args, **kwargs)
 
         return wrapped
@@ -286,7 +306,8 @@ def journey(request, metric: str, subject_id: str):
             return _error(404, "not_found", f"No opportunity or account with ID {subject_id!r}.")
         subject = {"type": "account", "id": account.external_id, "name": account.name}
         opportunities = list(related.filter(account=account).order_by("external_id"))
-    views = [journey_view(o, metric) for o in opportunities]
+    events = convert_events()  # once for all of an account's opportunities
+    views = [journey_view(o, metric, events=events) for o in opportunities]
     model_columns = views[0].models if views else []
     if not model_columns:
         models = attribution.standard_models(lookback_days=settings.ATTRIBUTION_LOOKBACK_DAYS)

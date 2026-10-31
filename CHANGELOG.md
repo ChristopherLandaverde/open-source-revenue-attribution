@@ -14,8 +14,8 @@ does. How releases are made: [docs/release.md](docs/release.md).
   id>` and `/api/v1/readiness` return the report, journey and readiness pages' numbers as JSON
   (`schemaVersion: "1"`, model names, and a `meaning` field: association under a named model,
   not causal impact). Authenticated by a per-user Bearer token from
-  `manage.py createapitoken <username>` or a signed-in session; GET only. Adds the `api` app
-  and one migration (`ApiToken`). No report number changes.
+  `manage.py createapitoken <username>` or a signed-in session; GET and HEAD only. Adds the
+  `api` app and one migration (`ApiToken`). No report number changes.
 
 ### Changed
 

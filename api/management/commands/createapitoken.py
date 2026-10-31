@@ -23,8 +23,8 @@ class Command(BaseCommand):
             raise CommandError(f"No user {username!r}. Create one with createsuperuser first.")
         if not user.is_active:
             raise CommandError(f"User {username!r} is inactive, so its token would be refused.")
-        record, token = ApiToken.issue(user, name)
+        _, token = ApiToken.issue(user, name)
         self.stdout.write(self.style.SUCCESS(f"Created API token {name!r} for {username!r}."))
         self.stdout.write(f"Token: {token}")
         self.stdout.write("Copy it now; it is not shown again. Send it as:")
-        self.stdout.write(f"  Authorization: Bearer {record.prefix}…")
+        self.stdout.write("  Authorization: Bearer <token>")

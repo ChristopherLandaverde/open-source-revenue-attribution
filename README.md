@@ -127,7 +127,7 @@ wording: values are association under a named model, not causal impact.
 | Endpoint | Returns | Page |
 |---|---|---|
 | `GET /api/v1/attribution?metric=pipeline\|won&model=<id>` | Credit per campaign for each model (or one), Influenced beside it, per currency; credit per opportunity | `/` |
-| `GET /api/v1/journeys/<opportunity or account id>?metric=&model=` | Each touch in order, its eligibility and why, and each model's credit; an account ID returns each of its opportunities | journey |
+| `GET /api/v1/journeys/<opportunity or account id>?metric=&model=` | Each touch in order, its eligibility and why, and each model's credit. An account ID returns each opportunity's contact journey, one per opportunity, not combined; an opportunity ID wins over an account ID with the same value | journey |
 | `GET /api/v1/readiness?metric=` | The 7 data checks: status, count and total, finding, fix, affected records | `/readiness/` |
 
 Model IDs: `first-touch`, `last-touch`, `linear`, `position-based-u-shaped`, `time-decay`.
@@ -138,14 +138,19 @@ Create a token for an existing user (shown once; only its hash is stored), then 
 Bearer token. A signed-in browser session works too. Revoke a token by deleting it in the admin
 under API tokens.
 
-```sh
-uv run python manage.py createapitoken admin --name agent
-# Created API token 'agent' for 'admin'.
-# Token: osra_…   (copy it now; it is not shown again)
-export OSRA_TOKEN=osra_…
+```console
+$ uv run python manage.py createapitoken admin --name agent
+Created API token 'agent' for 'admin'.
+Token: osra_enx_YAtOVpL06OuBqLovbReqKnBYhTVyYDDquQ46NlM
+Copy it now; it is not shown again. Send it as:
+  Authorization: Bearer <token>
+$ export OSRA_TOKEN=osra_enx_YAtOVpL06OuBqLovbReqKnBYhTVyYDDquQ46NlM
 ```
 
-On the bundled sample data (`load_sample_data`), output trimmed with `jq`:
+(That token is from a throwaway local database; yours will differ.)
+
+On the bundled sample data (`load_sample_data`). The output is trimmed by hand: fields and
+list items are left out, and the values shown are unchanged.
 
 ```sh
 curl -s -H "Authorization: Bearer $OSRA_TOKEN" \
@@ -228,7 +233,7 @@ curl -s -H "Authorization: Bearer $OSRA_TOKEN" http://127.0.0.1:8000/api/v1/read
 
 Without a valid token or session the API answers `401` with
 `{"schemaVersion": "1", "error": {"code": "not_authenticated", …}}` and no data. Any method
-other than GET gets `405`. Amounts are strings at the currency's minor unit (`"1200000"` for
+other than GET or HEAD gets `405`. Amounts are strings at the currency's minor unit (`"1200000"` for
 JPY), and times are ISO 8601 in UTC. There is no MCP server yet; it is the next step.
 
 ## What you get
@@ -254,7 +259,7 @@ JPY), and times are ISO 8601 in UTC. There is no MCP server yet; it is the next 
 | Opportunity journey | Each touch of the opportunity's contact, its eligibility and the reason, and each model's credit | Works |
 | Model comparison | 5 rule-based models per campaign and per opportunity, plus an overlapping Influenced column; pipeline and won revenue; optional lookback window | Works |
 | Data readiness | 7 checks with denominators, fixes and affected records; "Not checked" when there is no data | Works |
-| Read-only JSON API | `/api/v1/attribution`, `/journeys/<id>`, `/readiness` with a per-user Bearer token; same numbers as the pages | Works |
+| Read-only JSON API | `/api/v1/attribution`, `/journeys/<id>`, `/readiness` with a per-user Bearer token; same numbers as the pages. An account ID returns each opportunity's contact journey, not combined | Works |
 | Sign-in and self-hosting | Every page behind sign-in; Docker image and `compose.production.yml` with PostgreSQL 17 | Works |
 | Account journey (all contacts combined), stage history | | Planned |
 | W-shaped model (needs a lead milestone in the contract) | | Planned |

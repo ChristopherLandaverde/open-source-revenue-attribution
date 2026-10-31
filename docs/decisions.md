@@ -20,9 +20,10 @@ and the portfolio's live-API defaults (read-only, nothing published). Branch
   `osra_` prefix, so a fast hash is safe; a slow password hash would add nothing.
 - **Version in the path** (`/api/v1/`, like Plausible's `/api/v2/query`), plus
   `schemaVersion: "1"` in every body so a saved response says which schema it follows.
-- **Read-only.** GET only; other methods get 405 with `Allow: GET`. Responses are
-  `Cache-Control: no-store, private`. No CORS headers: the API is for servers and agents, not
-  other sites' pages, and `/v1/` CORS is unchanged.
+- **Read-only.** GET and HEAD (RFC 9110) only; other methods get 405 with `Allow: GET, HEAD`.
+  Responses are `Cache-Control: no-store, private`. No CORS headers: the API is for servers
+  and agents, not other sites' pages, and `/v1/` CORS is unchanged. A token's `last_used_at`
+  is its only write, at most once a minute and only for a request that passed validation.
 
 **Deviations:**
 1. **Tokens come from a management command, not a settings page.** `manage.py createapitoken
@@ -36,9 +37,9 @@ and the portfolio's live-API defaults (read-only, nothing published). Branch
    the API must return the pages' numbers. Unknown parameters (`start`, `end`) get a 400 that
    says so instead of being ignored.
 
-A signed-in browser session also authenticates (the same login as the pages). A request that
-sends an `Authorization` header is judged on it alone: a wrong token is a 401 even with a
-session.
+A signed-in browser session also authenticates (the same login as the pages). A request with
+an `Authorization: Bearer` header is judged on the token alone: a wrong token is a 401 even
+with a session. Other `Authorization` schemes are ignored, and the session decides.
 
 ## 2026-10-30 — Accept bare event arrays on `/v1/batch` (#16)
 

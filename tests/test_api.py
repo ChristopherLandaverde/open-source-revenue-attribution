@@ -6,6 +6,7 @@ the JSON for the bundled sample data, with and without the sample events.
 
 import base64
 import re
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -44,6 +45,14 @@ def dataset(request, sample, anon_client):
         )  # fmt: skip
         assert response.status_code == 200
     return request.param
+
+
+def when(value):
+    """An API time back to a datetime, to compare with the page's (None stays None)."""
+    if value is None:
+        return None
+    assert value.endswith("Z")  # always UTC
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def money(amount, currency):
@@ -102,6 +111,10 @@ def test_attribution_equals_the_report_page(client, dataset, metric):
     ]
     for row, out in zip(report.opportunities, data["opportunities"], strict=True):
         assert out["amount"] == money(row.opportunity.amount, row.opportunity.currency)
+        assert out["name"] == row.opportunity.name
+        assert out["stage"] == row.opportunity.stage
+        assert out["currency"] == row.opportunity.currency
+        assert when(out["convertedAt"]) == row.converted_at
         for model, credits in zip(ids, row.credits, strict=True):
             assert out["credits"][model] == [
                 {
@@ -145,6 +158,10 @@ def test_journey_equals_the_journey_page(client, dataset, metric, opportunity_id
     assert journey["eligibleTouches"] == view.eligible_count
     if view.journey:
         assert journey["unattributed"] == money(view.journey.unattributed, cur)
+        assert when(journey["conversionAt"]) == view.journey.conversion.converted_at
+        assert when(journey["windowStart"]) == view.journey.window_start
+    else:
+        assert journey["conversionAt"] is journey["windowStart"] is journey["unattributed"] is None
     assert [t["touchpointId"] for t in journey["touches"]] == [r.touchpoint_id for r in view.rows]
     for row, touch in zip(view.rows, journey["touches"], strict=True):
         assert touch["status"] == row.status
@@ -152,6 +169,19 @@ def test_journey_equals_the_journey_page(client, dataset, metric, opportunity_id
         assert touch["campaignKey"] == row.campaign_key
         assert touch["how"] == row.how
         assert touch["window"] == row.window_text
+        assert when(touch["occurredAt"]) == row.occurred_at
+        assert touch["origin"] == row.origin
+        assert touch["landingPage"] == row.landing_page
+        assert touch["referrer"] == row.referrer
+        assert touch["stitchedFrom"] == (row.stitched_from or None)
+        if row.session_id:
+            assert touch["session"] == {
+                "id": row.session_id,
+                "number": row.session_number,
+                "pageViews": row.session_size or None,
+            }
+        else:
+            assert touch["session"] is None
         if row.status == "in_session":
             assert set(touch["credits"].values()) == {None}  # "—" on the page
         else:
@@ -180,6 +210,42 @@ def test_account_id_returns_each_opportunitys_journey(client, sample):
     assert data["journeys"][1]["applies"] is False  # opp-104 is open: no won journey
 
 
+def test_opportunity_id_wins_over_an_account_with_the_same_id(client, sample):
+    from reports.models import Account
+
+    Account.objects.create(external_id="opp-101", name="Same ID as an opportunity")
+    assert api(client, "/api/v1/journeys/opp-101")["subject"]["type"] == "opportunity"
+
+
+def test_account_journey_converts_events_once(client, dataset, monkeypatch):
+    """Collected events are read once per request, however many opportunities the account has."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    import collection.services
+    import reports.services
+
+    calls = []
+    real = collection.services.convert_events
+
+    def counted():
+        calls.append(1)
+        return real()
+
+    monkeypatch.setattr("api.views.convert_events", counted)
+    monkeypatch.setattr(reports.services, "convert_events", counted)
+    with CaptureQueriesContext(connection) as queries:
+        data = api(client, "/api/v1/journeys/acc-northwind")
+    assert [j["opportunity"]["id"] for j in data["journeys"]] == ["opp-101", "opp-102"]
+    assert len(calls) == 1
+    event_reads = [q for q in queries if "collection_collectedevent" in q["sql"]]
+    assert len(event_reads) == 1, [q["sql"] for q in event_reads]
+    # Each opportunity's journey is still what its own endpoint returns.
+    for journey in data["journeys"]:
+        single = api(client, f"/api/v1/journeys/{journey['opportunity']['id']}")
+        assert single["journeys"] == [journey]
+
+
 @pytest.mark.parametrize("metric", METRICS)
 def test_readiness_equals_the_readiness_page(client, dataset, metric):
     view = page_context(client, "/readiness/", metric)["view"]
@@ -193,7 +259,18 @@ def test_readiness_equals_the_readiness_page(client, dataset, metric):
         for c in data["checks"]
     ] == [(c.key, c.title, c.status, c.count, c.total, c.percent, c.finding) for c in view.checks]
     assert [c["examples"] for c in data["checks"]] == [list(c.examples) for c in view.checks]
-    assert [c["fix"] for c in data["checks"]] == [c.fix for c in view.checks]
+    assert [(c["fix"], c["impact"], c["verify"]) for c in data["checks"]] == [
+        (c.fix, c.impact, c.verify) for c in view.checks
+    ]
+    assert [c["evidence"] for c in data["checks"]] == [
+        reverse(c.link) if c.link else None for c in view.checks
+    ]
+    assert (data["touchPeriod"] is None) == (view.touch_period is None)
+    if view.touch_period:
+        assert when(data["touchPeriod"]["from"]) == view.touch_period[0]
+        assert when(data["touchPeriod"]["to"]) == view.touch_period[1]
+    assert when(data["conversionPeriod"]["from"]) == view.conversion_period[0]
+    assert when(data["conversionPeriod"]["to"]) == view.conversion_period[1]
 
 
 def test_readiness_on_an_empty_dataset(client):
@@ -323,6 +400,32 @@ def test_a_wrong_token_is_refused_even_with_a_session(client, sample):
     assert client.get("/api/v1/readiness", **bearer("osra_wrong")).status_code == 401
 
 
+@pytest.mark.parametrize("header", ["Basic " + base64.b64encode(b"x:y").decode(), "Token whatever"])
+def test_other_authorization_schemes_fall_back_to_the_session(client, sample, header):
+    assert client.get("/api/v1/readiness", HTTP_AUTHORIZATION=header).status_code == 200
+
+
+def test_last_used_is_marked_only_after_validation_and_at_most_once_a_minute(
+    anon_client, sample, token
+):
+    record = ApiToken.objects.get()
+    assert anon_client.get("/api/v1/readiness", {"start": "x"}, **bearer(token)).status_code == 400
+    assert anon_client.get("/api/v1/readiness", {"metric": "x"}, **bearer(token)).status_code == 400
+    record.refresh_from_db()
+    assert record.last_used_at is None
+    assert anon_client.get("/api/v1/readiness", **bearer(token)).status_code == 200
+    record.refresh_from_db()
+    first = record.last_used_at
+    assert first is not None
+    assert anon_client.get("/api/v1/readiness", **bearer(token)).status_code == 200
+    record.refresh_from_db()
+    assert record.last_used_at == first  # within a minute: not written again
+    ApiToken.objects.update(last_used_at=first - timedelta(minutes=2))
+    assert anon_client.get("/api/v1/readiness", **bearer(token)).status_code == 200
+    record.refresh_from_db()
+    assert record.last_used_at > first - timedelta(minutes=2)
+
+
 def test_inactive_users_token_is_refused(anon_client, sample, token):
     ApiToken.objects.get().user.__class__.objects.update(is_active=False)
     assert anon_client.get("/api/v1/readiness", **bearer(token)).status_code == 401
@@ -346,6 +449,8 @@ def test_createapitoken_prints_a_working_token(anon_client, sample, django_user_
     out = capsys.readouterr().out
     token = re.search(r"Token: (osra_\S+)", out).group(1)
     assert ApiToken.objects.get().name == "claude"
+    assert "Authorization: Bearer <token>" in out
+    assert out.count(token) == 1  # printed once, never echoed in part
     assert anon_client.get("/api/v1/attribution", **bearer(token)).status_code == 200
 
 
@@ -362,12 +467,21 @@ def test_createapitoken_refuses_unknown_and_inactive_users(django_user_model):
 
 
 @pytest.mark.parametrize("path", ENDPOINTS)
-@pytest.mark.parametrize("method", ["post", "put", "patch", "delete", "options", "head"])
+@pytest.mark.parametrize("method", ["post", "put", "patch", "delete", "options", "trace"])
 def test_every_other_method_is_405(anon_client, sample, token, path, method):
     response = getattr(anon_client, method)(path, **bearer(token))
     assert response.status_code == 405
-    assert response["Allow"] == "GET"
+    assert response["Allow"] == "GET, HEAD"
+    assert ApiToken.objects.get().last_used_at is None  # refused before the token is marked used
     assert Opportunity.objects.count() == 6  # nothing changed
+
+
+@pytest.mark.parametrize("path", ENDPOINTS)
+def test_head_is_allowed(anon_client, sample, token, path):
+    response = anon_client.head(path, **bearer(token))
+    assert response.status_code == 200
+    assert response["Content-Type"] == "application/json"
+    assert anon_client.head(path).status_code == 401
 
 
 def test_write_method_with_session_and_no_csrf_token_is_405_not_a_write(sample, django_user_model):

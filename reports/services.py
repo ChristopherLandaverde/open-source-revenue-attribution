@@ -264,8 +264,13 @@ def _session_row(view, journey: attribution.Journey, number=None, position=None)
     )
 
 
-def journey_view(opportunity: Opportunity, metric: str = "pipeline") -> JourneyView:
-    """Every touch of the opportunity's contact, why it is (in)eligible, and each model's credit."""
+def journey_view(opportunity: Opportunity, metric: str = "pipeline", events=None) -> JourneyView:
+    """Every touch of the opportunity's contact, why it is (in)eligible, and each model's credit.
+
+    `events` is a `convert_events()` result to reuse across several opportunities (the API's
+    account journeys); by default it is computed here. It only supplies the in-session page
+    views, so passing it never changes any credit.
+    """
     if metric not in METRICS:
         raise ValueError(f"Unknown metric: {metric}")
     models = attribution.standard_models(lookback_days=settings.ATTRIBUTION_LOOKBACK_DAYS)
@@ -320,7 +325,7 @@ def journey_view(opportunity: Opportunity, metric: str = "pipeline") -> JourneyV
     # Later page views of each session (#7): shown under their session, never counted again.
     in_session: dict[str, list] = {}
     if contact:
-        for page_view in convert_events().session_views:
+        for page_view in (convert_events() if events is None else events).session_views:
             if page_view.contact_id == contact.external_id:
                 in_session.setdefault(page_view.session_id, []).append(page_view)
 
