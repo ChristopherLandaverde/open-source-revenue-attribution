@@ -2,6 +2,32 @@
 
 Product and data-meaning decisions, newest first. Each links the issue where it was made.
 
+## 2026-10-31 — MCP server over the JSON API (L2)
+
+Decided by Claude under the standing rule (adopt the industry standard or argue a deviation)
+and the portfolio's live-API defaults (read-only, bring your own credentials, nothing
+published). Branch `claude/osra-mcp`.
+
+**Adopted from the standard:**
+- **An MCP server is how an agent reads attribution data.** Dreamdata's public surface for
+  reading data is an MCP server (see the API decision below). Tools are read-only and say so
+  with MCP's `readOnlyHint` annotation.
+- **The official Python SDK** (`mcp`, pinned to exactly 2.3.0, released 2026-10-02) and the
+  stdio transport, which Claude Code, Claude Desktop and Cursor all start from a command line.
+
+**Deviations:**
+1. **Local stdio, not a hosted HTTP server with OAuth.** Dreamdata hosts its MCP server and
+   signs users in with OAuth 2.1. OSRA is self-hosted and has no authorization server, and the
+   portfolio defaults rule out a hosted backend. The agent starts `osra-mcp` on the user's
+   machine with the user's own API token (`OSRA_TOKEN`).
+2. **A client of the JSON API, not of the database.** The server makes one GET to `/api/v1/` per
+   tool call and returns the response unchanged, so the API stays the single source of numbers,
+   auth and read-only enforcement. It imports nothing from Django, and a test keeps its
+   `meaning` sentences identical to the API's.
+3. **Requests go to `OSRA_URL` only.** Journey IDs are checked against the contract's ID rule
+   before they go in the path, and redirects are not followed. A server that is missing,
+   misconfigured or answers without API JSON gives a structured tool error, never a guess.
+
 ## 2026-10-31 — Read-only JSON API and its auth (L1)
 
 Decided by Claude under the standing rule (adopt the industry standard or argue a deviation)

@@ -1,4 +1,4 @@
-"""Pure packages (attribution/, contracts/) must not import Django or app code."""
+"""Pure packages (attribution/, contracts/, the MCP server) must not import Django or app code."""
 
 import ast
 from pathlib import Path
@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-PURE_PACKAGES = ["attribution", "contracts"]
-FORBIDDEN_ROOTS = {"django", "reports", "config"}
+PURE_PACKAGES = ["attribution", "contracts", "mcp-server/osra_mcp"]
+FORBIDDEN_ROOTS = {"django", "reports", "config", "api", "collection"}
 
 
 def imported_roots(path: Path) -> set[str]:

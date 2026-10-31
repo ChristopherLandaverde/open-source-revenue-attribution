@@ -18,10 +18,17 @@ dev = [
     "pytest>=8.3",
     "pytest-django>=4.9",
     "ruff>=0.8",
+    { include-group = "mcp" },
 ]
+# The local MCP server (mcp-server/, entry point `osra-mcp`). Not needed by the Django app:
+# the production image installs without dev groups. `uv sync` installs it for development.
+mcp = ["osra-mcp"]
 
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+osra-mcp = { path = "mcp-server", editable = true }
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings_test"

@@ -10,6 +10,11 @@ does. How releases are made: [docs/release.md](docs/release.md).
 
 ### Added
 
+- **MCP server (`osra-mcp`).** A local stdio MCP server in `mcp-server/` with three read-only
+  tools, `get_attribution`, `get_journey` and `get_readiness`. Each one calls the JSON API at
+  `OSRA_URL` with the user's `OSRA_TOKEN` and returns its JSON unchanged. It is installed by
+  `uv sync` (the `mcp` dependency group, `mcp==2.3.0`), not by the Docker image, and is not
+  published. No report number changes.
 - **Read-only JSON API.** `GET /api/v1/attribution`, `/api/v1/journeys/<opportunity or account
   id>` and `/api/v1/readiness` return the report, journey and readiness pages' numbers as JSON
   (`schemaVersion: "1"`, model names, and a `meaning` field: association under a named model,

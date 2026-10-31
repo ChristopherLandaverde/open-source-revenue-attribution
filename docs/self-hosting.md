@@ -110,6 +110,10 @@ The token is printed once and only its SHA-256 hash is stored. It reads everythi
 can see and cannot write. Revoke it in Django admin under API tokens (delete it); deactivating
 the user also stops its tokens.
 
+For an agent, run the local MCP server (`osra-mcp`) on your own machine with this token in
+`OSRA_TOKEN` and `OSRA_URL=https://<your domain>`. Nothing is installed on the server for it.
+Setup: [README](../README.md#from-an-agent-over-mcp).
+
 ### Try it with the demo data
 
 ```sh
