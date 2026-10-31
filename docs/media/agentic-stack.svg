@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="620" viewBox="0 0 880 620" role="img" aria-labelledby="title desc">
+  <title id="title">Open Source Revenue Attribution agentic stack</title>
+  <desc id="desc">Four stacked layers. 1 Engine, level L0: 5 attribution models, journey joins and 7 readiness checks in pure Python, fed by CSV import, events and a read-only HubSpot import (L3, fixture-verified). 2 Tools, levels L1 and L2: a read-only JSON API with Bearer tokens and the osra-mcp server with get_attribution, get_journey and get_readiness. 3 Your agent, L2: Claude, Cursor or any MCP client on your machine, calling your own self-hosted instance. 4 You approve: no write tools; nothing writes, findings are evidence for you to act on, and imports are commands a person runs.</desc>
+  <!-- Focosys tokens (static/css/tokens.css): paper #F3F0E6, raised #EBE8DE, ink #10231F,
+       ink-secondary #426B5D, verified lime #D7FF69 (fill only on paper; text only on ink). -->
+  <style>
+    .sans { font-family: "DM Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+    .name { font-size: 21px; font-weight: 600; }
+    .lead { font-size: 16px; font-weight: 500; }
+    .code { font-size: 13.5px; }
+    .chip { font-size: 12px; font-weight: 600; }
+    .label { font-size: 12px; font-weight: 500; letter-spacing: 0.06em; }
+    .flow { font-size: 12px; }
+  </style>
+
+  <!-- Solid paper tile so it never sits on a transparent background (GitHub light and dark). -->
+  <rect x="0" y="0" width="880" height="620" rx="24" fill="#F3F0E6"/>
+  <rect x="0.5" y="0.5" width="879" height="619" rx="23.5" fill="none" stroke="#10231F" stroke-opacity="0.22"/>
+
+  <text x="32" y="40" class="mono label" fill="#426B5D">OPEN SOURCE REVENUE ATTRIBUTION · AGENTIC STACK</text>
+  <text x="848" y="40" class="mono label" fill="#426B5D" text-anchor="end">ON MAIN: L1 · L2 · L3 (FIXTURE-VERIFIED)</text>
+
+  <!-- 1 Engine -->
+  <rect x="32" y="60" width="816" height="112" rx="14" fill="#EBE8DE" stroke="#10231F" stroke-opacity="0.22"/>
+  <text x="56" y="98" class="sans name" fill="#10231F">1  Engine</text>
+  <rect x="56" y="114" width="38" height="24" rx="6" fill="#D7FF69" stroke="#10231F" stroke-opacity="0.35"/>
+  <text x="75" y="131" class="mono chip" fill="#10231F" text-anchor="middle">L0</text>
+  <text x="232" y="94" class="sans lead" fill="#10231F">5 attribution models · journey joins · 7 readiness checks</text>
+  <text x="232" y="120" class="mono code" fill="#426B5D">pure Python: attribution/ · contracts/ · owns every number</text>
+  <text x="232" y="146" class="mono code" fill="#426B5D">in: CSV · events (/v1/) · HubSpot read-only import</text>
+  <rect x="672" y="131" width="160" height="22" rx="6" fill="#D7FF69" stroke="#10231F" stroke-opacity="0.35"/>
+  <text x="752" y="146.5" class="mono chip" fill="#10231F" text-anchor="middle">L3 fixture-verified</text>
+
+  <!-- flow 1 -> 2 -->
+  <path d="M116 176 V200" stroke="#10231F" stroke-width="2" fill="none"/>
+  <path d="M109 194 L116 203 L123 194" stroke="#10231F" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+  <text x="136" y="194" class="mono flow" fill="#426B5D">same functions as the report pages</text>
+
+  <!-- 2 Tools -->
+  <rect x="32" y="208" width="816" height="112" rx="14" fill="#EBE8DE" stroke="#10231F" stroke-opacity="0.22"/>
+  <text x="56" y="246" class="sans name" fill="#10231F">2  Tools</text>
+  <rect x="56" y="262" width="38" height="24" rx="6" fill="#D7FF69" stroke="#10231F" stroke-opacity="0.35"/>
+  <text x="75" y="279" class="mono chip" fill="#10231F" text-anchor="middle">L1</text>
+  <rect x="102" y="262" width="38" height="24" rx="6" fill="#D7FF69" stroke="#10231F" stroke-opacity="0.35"/>
+  <text x="121" y="279" class="mono chip" fill="#10231F" text-anchor="middle">L2</text>
+  <text x="232" y="242" class="sans lead" fill="#10231F">Read-only JSON API with Bearer tokens · MCP server osra-mcp</text>
+  <text x="232" y="268" class="mono code" fill="#426B5D">GET /api/v1/attribution · /journeys/&lt;id&gt; · /readiness</text>
+  <text x="232" y="294" class="mono code" fill="#426B5D">get_attribution · get_journey · get_readiness (readOnlyHint)</text>
+
+  <!-- flow 2 -> 3 -->
+  <path d="M116 324 V348" stroke="#10231F" stroke-width="2" fill="none"/>
+  <path d="M109 342 L116 351 L123 342" stroke="#10231F" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+  <text x="136" y="342" class="mono flow" fill="#426B5D">one GET per tool call · the API's JSON, unchanged</text>
+
+  <!-- 3 Your agent (ink card: it is yours, not part of OSRA) -->
+  <rect x="32" y="356" width="816" height="112" rx="14" fill="#10231F"/>
+  <text x="56" y="394" class="sans name" fill="#F3F0E6">3  Your agent</text>
+  <rect x="56" y="410" width="38" height="24" rx="6" fill="#D7FF69"/>
+  <text x="75" y="427" class="mono chip" fill="#10231F" text-anchor="middle">L2</text>
+  <text x="232" y="390" class="sans lead" fill="#F3F0E6">Claude, Cursor, any MCP client</text>
+  <text x="232" y="416" class="mono code" fill="#D7FF69">on your machine · calls your own self-hosted instance</text>
+  <text x="232" y="442" class="mono code" fill="#D7FF69">quotes OSRA's numbers · names the model and window</text>
+
+  <!-- flow 3 -> 4 -->
+  <path d="M116 472 V496" stroke="#10231F" stroke-width="2" fill="none"/>
+  <path d="M109 490 L116 499 L123 490" stroke="#10231F" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+  <text x="136" y="490" class="mono flow" fill="#426B5D">association under a named model, never causal impact</text>
+
+  <!-- 4 You approve -->
+  <rect x="32" y="504" width="816" height="88" rx="14" fill="#F3F0E6" stroke="#10231F" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="56" y="542" class="sans name" fill="#10231F">4  You approve</text>
+  <rect x="56" y="556" width="124" height="24" rx="6" fill="#F3F0E6" stroke="#10231F" stroke-width="1.5"/>
+  <text x="118" y="573" class="mono chip" fill="#10231F" text-anchor="middle">no write tools</text>
+  <text x="232" y="536" class="sans lead" fill="#10231F">Nothing writes. Findings are evidence for you to act on.</text>
+  <text x="232" y="560" class="mono code" fill="#426B5D">imports (CSV, HubSpot) are commands a person runs</text>
+  <text x="232" y="582" class="mono code" fill="#426B5D">fixing the data and moving budget stay with you</text>
+</svg>
