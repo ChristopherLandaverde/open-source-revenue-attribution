@@ -27,6 +27,90 @@ published). Branch `claude/osra-mcp`.
 3. **Requests go to `OSRA_URL` only.** Journey IDs are checked against the contract's ID rule
    before they go in the path, and redirects are not followed. A server that is missing,
    misconfigured or answers without API JSON gives a structured tool error, never a guess.
+## 2026-10-31 — Read-only HubSpot import (L3, fixture-verified)
+
+Decided by Claude under the standing rule (adopt the industry standard or argue a deviation)
+and the portfolio's live-API defaults (read-only scopes, bring your own credentials, a test
+proving live and file inputs give identical numbers). Branch `claude/hubspot-import`.
+
+**Sources (read 2026-10-31):**
+- Dreamdata, [Setting up HubSpot](https://docs.dreamdata.io/article/rholhyxnwo-hubspot-integration):
+  companies, contacts and deals are mapped to Dreamdata's companies, contacts and deals. A
+  contact associated with several companies has its events counted for each.
+- Dreamdata, [Creation of Opportunities/Deals](https://docs.dreamdata.io/article/j6ut9wyyjw-setup-guide-creation-of-opportunities-deals):
+  the deal-created stage uses HubSpot's `hs_createdate`; `closedate` is the optional close
+  timestamp; the stage value is the deal Amount.
+- Dreamdata, [Currency exchange in stage models](https://docs.dreamdata.io/article/onh0zy6mio-how-dreamdata-handles-currency-exchange-in-stage-models):
+  a CRM object without a currency defaults to the account's primary currency, and amounts are
+  converted to it at ECB daily rates.
+- HubSpot, [List deals (CRM v3)](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/deals/get-deals.md):
+  `GET /crm/v3/objects/<type>` with `limit`, `after` (from `paging.next.after`), `properties`,
+  `associations` and `archived`. Associations come back inline as `{id, type}` with their own
+  `paging`.
+- HubSpot, [Using object APIs](https://developers.hubspot.com/docs/api-reference/latest/crm/using-object-apis):
+  up to 100 records per request, cursor paging, and a 403 naming `crm.objects.deals.read`.
+- HubSpot, [Associations v4](https://developers.hubspot.com/docs/api-reference/crm-associations-v4/guide):
+  type 5 is "Deal to primary company", 341 is "Deal to company", 1 is "Contact to primary
+  company", 279 is "Contact to company" and 3 is "Deal to contact". In v3 inline results, the
+  primary association is listed as `deal_to_company` next to `deal_to_company_unlabeled`
+  ([HubSpot Community, confirmed by a community manager](https://community.hubspot.com/t5/APIs-Integrations/Object-data-fetch-sorting-out-associations/td-p/658333)).
+- HubSpot, [Usage guidelines](https://developers.hubspot.com/docs/developer-tooling/platform/usage-guidelines.md):
+  private apps get 100 (Free/Starter) or 190 (Pro/Enterprise) requests per 10 seconds, plus a
+  daily cap. A 429 has `errorType: RATE_LIMIT`. `Retry-After` is not documented.
+- HubSpot, [Legacy private apps](https://developers.hubspot.com/docs/apps/legacy-apps/private-apps/overview)
+  (Bearer token; no new legacy private apps after 2026-10-26) and
+  [Service keys](https://developers.hubspot.com/blog/hubspot-service-keys-the-right-api-credential-for-data-integrations)
+  (account-level, data-only credentials, sent as a Bearer token).
+- HubSpot, [Default deal properties](https://knowledge.hubspot.com/properties/hubspots-default-deal-properties):
+  Amount ("in the deal's currency"), Currency, Close Date ("expected to close, or was
+  closed"), Create Date, Is Closed Won, Is closed lost.
+
+**Adopted from the standard (Dreamdata):**
+- Companies become accounts, contacts become contacts and deals become opportunities. HubSpot's
+  record IDs are the IDs, as Dreamdata matches companies by ID.
+- **Pipeline conversion = `hs_createdate`** (then `createdate`, then the record's `createdAt`).
+  This matches Dreamdata's deal-created stage and our 2026-10-29 decision that pipeline credit
+  is measured at creation.
+- **Won = `hs_is_closed_won`**, with `won_at = closedate`, Dreamdata's close timestamp. For an
+  open deal, `closedate` is the *expected* close date, so it is not passed on (the contract
+  refuses `won_at` on an open opportunity).
+- **Value = `amount` in `deal_currency_code`**, as stored.
+- Read-only access with the three `crm.objects.*.read` scopes. Nothing is written to HubSpot.
+  Dreamdata's reverse sync to HubSpot properties is out of scope.
+
+**Deviations:**
+1. **Amounts are not converted.** Dreamdata converts every deal to one account currency. OSRA
+   reports each currency side by side and never sums them (existing contract), so the import
+   keeps the deal's own currency. A deal with no currency is refused
+   (`MISSING_REQUIRED_FIELD`) unless `--currency` names one. We don't read HubSpot's company
+   currency, which would need another endpoint and scope.
+2. **One contact per deal.** Dreamdata is account-based and counts the touches of every
+   contact. OSRA's journeys are per opportunity contact (known limit). A deal with several
+   contacts uses one of its own company's contacts first, then the earliest created contact,
+   then the lowest ID. The command reports how many deals had more than one contact.
+3. **One company per contact and per deal: the primary one.** Dreamdata counts a contact's
+   events for every company it is associated with. Our contract has one `account_id`, so we use
+   the primary association. If there is no primary, we use the only company. If several
+   companies are associated and none is primary, the row is refused (`MISSING_REQUIRED_FIELD`)
+   rather than guessed.
+4. **Closed-lost deals are refused visibly.** They are passed on as stage `lost`, and the
+   contract refuses it (`INVALID_STAGE`, decision of 2026-10-29: `lost` is refused for now).
+   Dreamdata would count them in pipeline. Accepting them needs the `lost` stage decision.
+5. **No touches from HubSpot.** Dreamdata also maps engagements (calls, meetings, emails) to
+   events on paid plans. OSRA's touches stay web sessions (events or `touchpoints.csv`). An
+   `identify` call must use the HubSpot contact ID as `userId` for events to join.
+6. **Full read on every run**, with no incremental sync or deletes, the same as re-importing
+   CSVs. Dreamdata syncs on a schedule.
+7. **CRM v3 object endpoints**, as briefed. HubSpot's reference now lists v3 under "legacy",
+   next to date-versioned paths (`/crm/objects/2026-03/…`). Moving to those paths later doesn't
+   change the mapping.
+8. **Backoff:** `Retry-After` if HubSpot sends it, otherwise 1, 2, 4, 8 and 16 seconds (more
+   than one 10-second burst window). We retry 429 and 5xx at most 5 times, then stop with an
+   error and write nothing.
+
+**Not used:** the CRM search endpoint (`POST /crm/v3/objects/<type>/search`). List endpoints
+with `associations=` cover the read without a POST, so there is no allowlisted exception: the
+client sends only GET requests.
 
 ## 2026-10-31 — Read-only JSON API and its auth (L1)
 

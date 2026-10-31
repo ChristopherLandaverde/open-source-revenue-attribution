@@ -125,6 +125,26 @@ dataset your real data goes in, and there is no command to remove them again. Tr
 throwaway stack, then wipe it with `docker compose -f compose.production.yml down -v` (deletes
 the database volume) before importing real data.
 
+### Import from HubSpot
+
+`import_hubspot` reads companies, contacts and deals with a read-only HubSpot token and loads
+them through the same validation as the CSV import ([README](../README.md#live-import-from-hubspot)).
+On the Docker stack, pass the token for the one command instead of saving it in `.env`:
+
+```sh
+read -rs HUBSPOT_TOKEN && export HUBSPOT_TOKEN      # paste the token; it is not echoed
+docker compose -f compose.production.yml exec -e HUBSPOT_TOKEN="$HUBSPOT_TOKEN" app \
+  python manage.py import_hubspot --dry-run
+docker compose -f compose.production.yml exec -e HUBSPOT_TOKEN="$HUBSPOT_TOKEN" app \
+  python manage.py import_hubspot
+```
+
+The app container needs outbound HTTPS to `api.hubapi.com`, and nothing else is contacted.
+Grant the token only `crm.objects.companies.read`, `crm.objects.contacts.read` and
+`crm.objects.deals.read`. Re-running it updates records by their HubSpot IDs and never deletes
+any. The import is fixture-verified and has not yet been run against a real portal or on the
+Docker stack.
+
 ## Reverse proxy and TLS
 
 Bring your own proxy, as with Umami and Matomo. Plausible also documents this route. The proxy

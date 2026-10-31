@@ -15,6 +15,12 @@ does. How releases are made: [docs/release.md](docs/release.md).
   `OSRA_URL` with the user's `OSRA_TOKEN` and returns its JSON unchanged. It is installed by
   `uv sync` (the `mcp` dependency group, `mcp==2.3.0`), not by the Docker image, and is not
   published. No report number changes.
+- **HubSpot import (`manage.py import_hubspot`).** Reads companies, contacts and deals with a
+  read-only token (`HUBSPOT_TOKEN`; scopes `crm.objects.companies.read`,
+  `crm.objects.contacts.read`, `crm.objects.deals.read`) and imports them through the same
+  validation and load as the CSV import. `--dry-run` writes nothing. GET requests to
+  api.hubapi.com only. Fixture-verified; not yet run against a real HubSpot portal. No report
+  number changes for existing data.
 - **Read-only JSON API.** `GET /api/v1/attribution`, `/api/v1/journeys/<opportunity or account
   id>` and `/api/v1/readiness` return the report, journey and readiness pages' numbers as JSON
   (`schemaVersion: "1"`, model names, and a `meaning` field: association under a named model,

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from django.conf import settings
 from django.db import transaction
 
+from attribution import describe_window
 from collection.services import sync_event_touchpoints
 from contracts import ImportBatch, ImportReport, validate_import
 from reports.models import Account, Contact, ImportRun, Opportunity, Touchpoint
@@ -91,3 +92,28 @@ def _load(report: ImportReport) -> None:
                 "referrer": rec.referrer,
             },
         )
+
+
+def describe_report(command, report: ImportReport, source: str) -> None:
+    """Print a validation report from a management command: totals, file errors, refused rows."""
+    counts = report.counts.values()
+    received = sum(c["received"] for c in counts)
+    accepted = sum(c["accepted"] for c in counts)
+    duplicates = sum(c["duplicates"] for c in counts)
+    command.stdout.write(
+        f"Validated {source} ({describe_window(report.lookback_days)}): {received} rows, "
+        f"{accepted} accepted, {len(report.rejected)} refused, {duplicates} exact "
+        f"duplicates ignored, {len(report.warnings)} warnings."
+    )
+    if report.file_errors:
+        command.stderr.write(command.style.ERROR("File errors (file refused):"))
+        for issue in report.file_errors:
+            command.stderr.write(f"  {issue.file}: {issue.code} {issue.field} - {issue.message}")
+    if report.rejected:
+        command.stderr.write(command.style.WARNING("Refused rows (not loaded):"))
+        for row in report.rejected:
+            for issue in row.issues:
+                command.stderr.write(
+                    f"  {issue.file} row {issue.row} [{row.record_id or 'no id'}]: "
+                    f"{issue.code} {issue.field} - {issue.message}"
+                )
