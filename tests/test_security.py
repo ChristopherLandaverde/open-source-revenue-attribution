@@ -236,14 +236,39 @@ def test_preflight_allows_every_header_the_sdk_sends(anon_client, workspace):
     assert "Access-Control-Request-Headers" in preflight["Vary"]
 
 
-def test_preflight_echoes_only_valid_header_names(anon_client, workspace):
+def _safe_cors_headers() -> str:
+    return (
+        "authorization, content-type, anonymousid, sentat, rsa-recovered, rsa-retry-attempt, "
+        "rsa-since-last-attempt, rsa-since-first-attempt, rsa-retry-reason"
+    )
+
+
+@pytest.mark.parametrize(
+    "requested",
+    [
+        "x-" + "a" * 1023,
+        ",".join(f"x-{i}" for i in range(21)),
+        "x-ok, bad header",
+        "x-ok, x-good\r\nx-evil",
+    ],
+)
+def test_preflight_invalid_or_oversized_headers_use_safe_list(anon_client, workspace, requested):
     preflight = anon_client.options(
         "/v1/batch",
         HTTP_ORIGIN=OTHER,
         HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
-        HTTP_ACCESS_CONTROL_REQUEST_HEADERS="authorization, bad header, x-ok",
+        HTTP_ACCESS_CONTROL_REQUEST_HEADERS=requested,
     )
-    assert preflight["Access-Control-Allow-Headers"] == "authorization, x-ok"
+    assert preflight["Access-Control-Allow-Headers"].lower() == _safe_cors_headers()
+
+
+def test_preflight_valid_headers_are_lowercased_and_deduplicated(anon_client, workspace):
+    preflight = anon_client.options(
+        "/v1/batch",
+        HTTP_ORIGIN=OTHER,
+        HTTP_ACCESS_CONTROL_REQUEST_HEADERS="X-One, authorization, x-one, CONTENT-TYPE",
+    )
+    assert preflight["Access-Control-Allow-Headers"] == "x-one, authorization, content-type"
 
 
 def test_allowed_origin_still_needs_a_write_key(anon_client, workspace, settings):
@@ -256,7 +281,14 @@ def test_allowed_origin_still_needs_a_write_key(anon_client, workspace, settings
 
 def test_unlisted_origin_is_refused_when_others_are_allowed(anon_client, workspace, settings):
     settings.COLLECT_ALLOWED_ORIGINS = [ALLOWED]
-    assert anon_client.options("/v1/batch", HTTP_ORIGIN=OTHER).status_code == 403
+    preflight = anon_client.options(
+        "/v1/batch",
+        HTTP_ORIGIN=OTHER,
+        HTTP_ACCESS_CONTROL_REQUEST_HEADERS="authorization, content-type",
+    )
+    assert preflight.status_code == 403
+    assert "Access-Control-Allow-Origin" not in preflight
+    assert "Access-Control-Allow-Headers" not in preflight
     response = send(anon_client, HTTP_ORIGIN=OTHER, **auth())
     assert response.status_code == 403
     assert "Access-Control-Allow-Origin" not in response
