@@ -15,7 +15,7 @@
 <p align="center">
   <a href="https://github.com/ChristopherLandaverde/open-source-revenue-attribution/actions/workflows/ci.yml"><img src="https://github.com/ChristopherLandaverde/open-source-revenue-attribution/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/ChristopherLandaverde/open-source-revenue-attribution?color=10231F" alt="License: MIT"></a>
-  <a href="#agentic"><img src="https://img.shields.io/badge/agentic-L1%C2%B7L2%C2%B73-D7FF69?labelColor=10231F" alt="Agentic levels L1, L2 and L3 (fixture-verified): see the Agentic section"></a>
+  <a href="#agentic"><img src="https://img.shields.io/badge/agentic-L1%C2%B7L2%C2%B7L3-D7FF69?labelColor=10231F" alt="Agentic levels L1, L2 and L3 (fixture-verified): see the Agentic section"></a>
 </p>
 
 <p align="center">
@@ -48,18 +48,18 @@ shows association under a named rule and window, not causal impact or incrementa
   <img src="docs/media/agentic-stack.svg" width="880" alt="The agentic stack in four layers. 1 Engine (the base layer): 5 attribution models, journey joins and 7 readiness checks in pure Python, fed by CSV import, events and a read-only HubSpot import (L3, fixture-verified). 2 Tools (L1, L2): a read-only JSON API with Bearer tokens and the osra-mcp server with get_attribution, get_journey and get_readiness. 3 Your agent (L2): Claude, Cursor or any MCP client on your machine, calling your own self-hosted instance. 4 You approve: no write tools; findings are evidence for you to act on.">
 </p>
 
-The engine computes every number; your agent only quotes it, under the named model and window.
+The engine computes every number; the server tells your agent to quote it under the named model and window.
 `osra-mcp` runs on your machine and calls your own instance's API with your token.
 
 | Ask your agent… | Tool | Reads | Writes |
 |---|---|---|---|
 | "Which campaigns get pipeline credit under linear, and how does that differ from first-touch?" | `get_attribution` | Credit per campaign for each model, Influenced beside it, per currency | nothing |
-| "How much won revenue does `abm-launch` get under position-based?" | `get_attribution` | The same table for won revenue (`metric: won`), one model | nothing |
+| "How much won revenue does `abm-launch` get under position-based (U-shaped)?" | `get_attribution` | The same table for won revenue (`metric: won`), one model | nothing |
 | "Why does `q1-search` get nothing for opp-101 under last-touch?" | `get_journey` | Each touch of the opportunity's contact, its eligibility and why, each model's credit | nothing |
 | "Can I trust these numbers yet? What should I fix first?" | `get_readiness` | The 7 data checks: status, count, finding, fix, affected records | nothing |
 
-Agentic levels: L1 machine-readable · L2 agent-callable · L3 live read · L4 proposes changes
-for you to approve. OSRA: L1 (JSON API) · L2 (`osra-mcp`) · L3 (HubSpot import, fixture-verified:
+Agentic levels: L1 machine-readable · L2 agent-callable · L3 live read.
+OSRA: L1 (JSON API) · L2 (`osra-mcp`) · L3 (HubSpot import, fixture-verified:
 tested against synthetic HubSpot API responses, not yet a real portal). Details: [Use it from an agent / API](#use-it-from-an-agent--api) ·
 [MCP server](#from-an-agent-over-mcp) · [Live import from HubSpot](#live-import-from-hubspot).
 
@@ -503,8 +503,8 @@ v0.1.0 browser walkthrough is in
 [docs/reviews/2026-10-30-v0.1.0-walkthrough.md](docs/reviews/2026-10-30-v0.1.0-walkthrough.md).
 Milestones: [docs/project-management-plan.md](docs/project-management-plan.md).
 
-Planned next: closed-lost deals in the HubSpot import
-([#22](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/22)), and a
+Planned next: closed-lost deals (proposed,
+[#22](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/22)), and a
 run against a real HubSpot portal, which would make L3 more than fixture-verified. No write tools
 are planned.
 
