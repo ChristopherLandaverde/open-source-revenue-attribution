@@ -5,42 +5,63 @@
 <h1 align="center">Open Source Revenue Attribution</h1>
 
 <p align="center">
-  <strong>Trace closed-won revenue back to the touches behind it, and check every step of the math.</strong>
+  <strong>Trace closed-won revenue to the touches behind it. Check the math in the app or from your AI agent.</strong>
 </p>
 
 <p align="center">
-  5 named models side by side · 7 data-readiness checks · RudderStack-compatible event collection · self-hostable with Docker Compose and PostgreSQL 17
+  5 named models side by side · 7 data-readiness checks · MCP server for Claude, Cursor and any MCP client · self-hostable with Docker Compose and PostgreSQL 17
 </p>
 
 <p align="center">
   <a href="https://github.com/ChristopherLandaverde/open-source-revenue-attribution/actions/workflows/ci.yml"><img src="https://github.com/ChristopherLandaverde/open-source-revenue-attribution/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/ChristopherLandaverde/open-source-revenue-attribution?color=10231F" alt="License: MIT"></a>
+  <a href="#agentic"><img src="https://img.shields.io/badge/agentic-L1%C2%B7L2%C2%B7L3-D7FF69?labelColor=10231F" alt="Agentic levels L1, L2 and L3 (fixture-verified): see the Agentic section"></a>
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick start</a> · <a href="#send-events">Send events</a> · <a href="#what-you-get">What you get</a> · <a href="#known-limits">Known limits</a> · <a href="docs/how-it-works.md">How it works</a> · <a href="docs/self-hosting.md">Self-hosting</a> · <a href="docs/contract.md">Data contract</a>
+  <a href="#quick-start">Quick start</a> · <a href="#agentic">For agents</a> · <a href="#send-events">Send events</a> · <a href="#what-you-get">What you get</a> · <a href="#known-limits">Known limits</a> · <a href="docs/how-it-works.md">How it works</a> · <a href="docs/self-hosting.md">Self-hosting</a> · <a href="docs/contract.md">Data contract</a>
 </p>
 
 Open Source Revenue Attribution is a self-hostable app for B2B marketers, founders and RevOps
 analysts who have to explain which campaigns are associated with pipeline and won revenue, and
 defend the number. It shows the whole chain: CSV row or event → validated record → contact →
-eligible journey → named model → credit that adds up to the deal amount.
+eligible journey → named model → credit that adds up to the deal amount. Your own AI agent can
+read the same numbers, journeys and readiness checks from your instance through read-only tools;
+it changes nothing, and fixing the data or moving budget stays with you.
 
 On the bundled synthetic sample, `google / cpc / q1-search` gets **39000.00 USD** of the
 54000.00 USD pipeline under first-touch and **0** under last-touch. `linkedin / paid-social /
 abm-launch` gets the reverse. Same touches; only the named model changed.
 
 That number usually comes from a tool that won't show its work: which touches counted, which
-were dropped and why, which rule split the deal. So budget moves on a number nobody can audit,
-even though the model choice alone can move a campaign from all of a deal's credit to none.
-Attribution here is a
-reporting model: it shows association under a named rule and window, not causal impact or
-incrementality.
+were dropped and why, which rule split the deal. Attribution here is a reporting model: it
+shows association under a named rule and window, not causal impact or incrementality.
 
 <p align="center">
   <img src="docs/media/proof.gif" width="880" alt="Four storyboard frames on a dark green stage, each with a step counter and a headline. 1 of 4: the bundled synthetic sample, 4 CSVs and 43 rows, 10 of them invalid on purpose; an excerpt of sample_data/demo/touchpoints.csv with the q1-search rows (tp-01, tp-07) and abm-launch rows (tp-02, tp-08) highlighted, beside the Data validation page after Import the demo data set: 10 rows refused, the other 32 loaded, rows by file. 2 of 4: the model comparison's USD table; google / cpc / q1-search gets 39000.00 of 54000.00 USD under first-touch and 0 under last-touch, linkedin / paid-social / abm-launch the reverse; every model column totals 54000.00. 3 of 4: the journey of Northwind platform, touch by touch: tp-01 gets 24000.00 under first-touch and 0.00 under last-touch, tp-02 the reverse, tp-03 came after the conversion and gets no credit; each column adds up to 24000.00 USD. 4 of 4: opportunities.csv row 5, opp-104, has an empty contact_id, beside Data readiness: 3 checks need a fix, the first being 5 of 6 opportunities have a contact, with why, fix, how to verify and the record opp-104.">
   <br><sub>Built by <a href="scripts/readme-demo/">scripts/readme-demo/</a> from the running app on <code>sample_data/demo/</code> (synthetic, <code>*.example</code> domains). Every number in the captions is read from the app during the run.</sub>
 </p>
+
+## Agentic
+
+<p align="center">
+  <img src="docs/media/agentic-stack.svg" width="880" alt="The agentic stack in four layers. 1 Engine (the base layer): 5 attribution models, journey joins and 7 readiness checks in pure Python, fed by CSV import, events and a read-only HubSpot import (L3, fixture-verified). 2 Tools (L1, L2): a read-only JSON API with Bearer tokens and the osra-mcp server with get_attribution, get_journey and get_readiness. 3 Your agent (L2): Claude, Cursor or any MCP client on your machine, calling your own self-hosted instance. 4 You approve: no write tools; findings are evidence for you to act on.">
+</p>
+
+The engine computes every number; the server tells your agent to quote it under the named model and window.
+`osra-mcp` runs on your machine and calls your own instance's API with your token.
+
+| Ask your agent… | Tool | Reads | Writes |
+|---|---|---|---|
+| "Which campaigns get pipeline credit under linear, and how does that differ from first-touch?" | `get_attribution` | Credit per campaign for each model, Influenced beside it, per currency | nothing |
+| "How much won revenue does `abm-launch` get under position-based (U-shaped)?" | `get_attribution` | The same table for won revenue (`metric: won`), one model | nothing |
+| "Why does `q1-search` get nothing for opp-101 under last-touch?" | `get_journey` | Each touch of the opportunity's contact, its eligibility and why, each model's credit | nothing |
+| "Can I trust these numbers yet? What should I fix first?" | `get_readiness` | The 7 data checks: status, count, finding, fix, affected records | nothing |
+
+Agentic levels: L1 machine-readable · L2 agent-callable · L3 live read.
+OSRA: L1 (JSON API) · L2 (`osra-mcp`) · L3 (HubSpot import, fixture-verified:
+tested against synthetic HubSpot API responses, not yet a real portal). It has no L4: nothing writes. Details: [Use it from an agent / API](#use-it-from-an-agent--api) ·
+[MCP server](#from-an-agent-over-mcp) · [Live import from HubSpot](#live-import-from-hubspot).
 
 ## Quick start
 
@@ -481,6 +502,11 @@ tagged or released, and no Docker image or package is published: run it from a c
 v0.1.0 browser walkthrough is in
 [docs/reviews/2026-10-30-v0.1.0-walkthrough.md](docs/reviews/2026-10-30-v0.1.0-walkthrough.md).
 Milestones: [docs/project-management-plan.md](docs/project-management-plan.md).
+
+Planned next: closed-lost deals (proposed,
+[#22](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/22)), and a
+run against a real HubSpot portal, which would make L3 more than fixture-verified. No write tools
+are planned.
 
 ## Development
 
