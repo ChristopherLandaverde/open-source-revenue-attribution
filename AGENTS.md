@@ -70,3 +70,12 @@ no React/Vite) · Django ORM + migrations on PostgreSQL · pytest + pytest-djang
 - Vendored assets: record version, source URL, license, and SHA-256 in
   `static/vendor/README.md`.
 - Commit messages end with the co-author line the session specifies.
+
+## Merging
+
+Standing permission from the owner (Christopher Landaverde, 2026-10-30): agents merge their own pull requests, user-visible ones included, without asking, when all of these hold:
+- CI is green on GitHub on the PR's latest commit (`gh pr checks <n>`; local runs don't count).
+- An agent other than the author reviewed the diff and posted `Blocking findings: none`.
+- The PR merges cleanly into `main`.
+
+Merge with `gh pr merge <n> --squash --delete-branch`, then confirm `main` CI passes. Still stop and ask for: releases, tags, store or package publishing, deploys, repo settings or visibility, spending money, and deleting anything you didn't create. Never push directly to `main` or force-push a shared branch.
