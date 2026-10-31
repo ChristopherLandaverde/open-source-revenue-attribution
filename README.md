@@ -117,6 +117,120 @@ links their earlier page views to the contact.
 
 Not affiliated with RudderStack.
 
+## Use it from an agent / API
+
+Read-only JSON endpoints return what the report pages show, computed by the same functions, so
+an agent or script gets the page's numbers rather than its own. Every response has
+`schemaVersion: "1"`, the model names, the window, and a `meaning` field with the pages' own
+wording: values are association under a named model, not causal impact.
+
+| Endpoint | Returns | Page |
+|---|---|---|
+| `GET /api/v1/attribution?metric=pipeline\|won&model=<id>` | Credit per campaign for each model (or one), Influenced beside it, per currency; credit per opportunity | `/` |
+| `GET /api/v1/journeys/<opportunity or account id>?metric=&model=` | Each touch in order, its eligibility and why, and each model's credit; an account ID returns each of its opportunities | journey |
+| `GET /api/v1/readiness?metric=` | The 7 data checks: status, count and total, finding, fix, affected records | `/readiness/` |
+
+Model IDs: `first-touch`, `last-touch`, `linear`, `position-based-u-shaped`, `time-decay`.
+There are no date filters (`start`, `end`), because the pages have none; unknown parameters
+get a 400 that says so.
+
+Create a token for an existing user (shown once; only its hash is stored), then send it as a
+Bearer token. A signed-in browser session works too. Revoke a token by deleting it in the admin
+under API tokens.
+
+```sh
+uv run python manage.py createapitoken admin --name agent
+# Created API token 'agent' for 'admin'.
+# Token: osra_…   (copy it now; it is not shown again)
+export OSRA_TOKEN=osra_…
+```
+
+On the bundled sample data (`load_sample_data`), output trimmed with `jq`:
+
+```sh
+curl -s -H "Authorization: Bearer $OSRA_TOKEN" \
+  "http://127.0.0.1:8000/api/v1/attribution?model=linear"
+```
+
+```json
+{
+  "schemaVersion": "1",
+  "meaning": "Each column applies one named rule to the same touches. The numbers show association under that rule, not causal impact: no column shows that a campaign caused a deal. A gap between columns is the rules' difference, not a measured lift.",
+  "metric": { "id": "pipeline", "label": "Pipeline (credited at opportunity creation)" },
+  "window": { "lookbackDays": null, "description": "No lookback cap: every touch up to the conversion" },
+  "models": [{ "id": "linear", "name": "Linear", "parameters": "Equal share to every eligible touch", "standard": "Dreamdata, HockeyStack, GA4 (legacy)" }],
+  "dataReadiness": { "opportunities": 6, "attributable": 5, "checksToFix": ["contact", "utm", "import"], "details": "/api/v1/readiness?metric=pipeline" },
+  "currencies": [
+    {
+      "currency": "USD", "total": "54000.00", "opportunities": 4, "unattributed": "9000.00",
+      "rows": [
+        {
+          "campaignKey": "google / cpc / q1-search",
+          "unattributed": false,
+          "attributed": { "linear": "19500.00" },
+          "influenced": { "amount": "39000.00", "opportunities": 2 }
+        }
+      ]
+    }
+  ]
+}
+```
+
+```sh
+curl -s -H "Authorization: Bearer $OSRA_TOKEN" http://127.0.0.1:8000/api/v1/journeys/opp-101
+```
+
+```json
+{
+  "schemaVersion": "1",
+  "subject": { "type": "opportunity", "id": "opp-101" },
+  "journeys": [
+    {
+      "opportunity": { "id": "opp-101", "amount": "24000.00", "currency": "USD", "contactId": "con-nw-ana" },
+      "conversionAt": "2026-04-01T12:00:00Z",
+      "eligibleTouches": 2,
+      "touches": [
+        {
+          "position": 1, "touchpointId": "tp-01", "campaignKey": "google / cpc / q1-search", "status": "eligible",
+          "credits": { "first-touch": "24000.00", "last-touch": "0.00", "linear": "12000.00", "position-based-u-shaped": "12000.00", "time-decay": "2265.76" }
+        },
+        {
+          "position": 3, "touchpointId": "tp-03", "campaignKey": "partner / referral / may-webinar", "status": "after",
+          "credits": { "first-touch": null, "last-touch": null, "linear": null, "position-based-u-shaped": null, "time-decay": null }
+        }
+      ]
+    }
+  ]
+}
+```
+
+```sh
+curl -s -H "Authorization: Bearer $OSRA_TOKEN" http://127.0.0.1:8000/api/v1/readiness
+```
+
+```json
+{
+  "schemaVersion": "1",
+  "verdict": "fix_data_first",
+  "opportunities": 6,
+  "attributable": 5,
+  "noEligibleTouch": ["opp-104"],
+  "checks": [
+    {
+      "key": "contact", "status": "review", "count": 5, "total": 6,
+      "finding": "5 of 6 opportunities have a contact.",
+      "fix": "Fill contact_id in opportunities.csv for these opportunities, then import again.",
+      "examples": ["opp-104"]
+    }
+  ]
+}
+```
+
+Without a valid token or session the API answers `401` with
+`{"schemaVersion": "1", "error": {"code": "not_authenticated", …}}` and no data. Any method
+other than GET gets `405`. Amounts are strings at the currency's minor unit (`"1200000"` for
+JPY), and times are ISO 8601 in UTC. There is no MCP server yet; it is the next step.
+
 ## What you get
 
 - **Every number traced to its source.** Open any opportunity to see each touch of its contact, why it is or isn't eligible, and what each model gives it.
@@ -140,9 +254,11 @@ Not affiliated with RudderStack.
 | Opportunity journey | Each touch of the opportunity's contact, its eligibility and the reason, and each model's credit | Works |
 | Model comparison | 5 rule-based models per campaign and per opportunity, plus an overlapping Influenced column; pipeline and won revenue; optional lookback window | Works |
 | Data readiness | 7 checks with denominators, fixes and affected records; "Not checked" when there is no data | Works |
+| Read-only JSON API | `/api/v1/attribution`, `/journeys/<id>`, `/readiness` with a per-user Bearer token; same numbers as the pages | Works |
 | Sign-in and self-hosting | Every page behind sign-in; Docker image and `compose.production.yml` with PostgreSQL 17 | Works |
 | Account journey (all contacts combined), stage history | | Planned |
 | W-shaped model (needs a lead milestone in the contract) | | Planned |
+| MCP server over the JSON API | | Planned |
 | Release | v0.1.0 prepared in [CHANGELOG.md](CHANGELOG.md) | Prepared, not tagged |
 
 Details for every row: [docs/how-it-works.md](docs/how-it-works.md).
@@ -168,6 +284,8 @@ Details for every row: [docs/how-it-works.md](docs/how-it-works.md).
   volumes, not tuned for large ones.
 - **Journeys are per opportunity contact.** The page lists the account's other contacts but
   does not combine them into an account journey yet.
+- **API tokens read everything.** A token acts as its user, who sees all data (there are no
+  roles); tokens have no scopes or expiry. Revoke one by deleting it in the admin.
 - **Stages are `open` and `won` only**; mixed currencies are reported side by side, never summed.
 - **Not yet run on a public domain.** The self-hosted stack was run end to end on 2026-10-29
   behind Caddy with a local certificate; a Let's Encrypt deployment is untested.

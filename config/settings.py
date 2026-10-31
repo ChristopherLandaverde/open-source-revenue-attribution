@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "reports",
     "collection",
+    "api",
 ]
 
 MIDDLEWARE = [
@@ -59,7 +60,8 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # Every page needs a signed-in user except those marked @login_not_required: the /v1/
-    # collection endpoint (write-key auth), the login page and the health check.
+    # collection endpoint (write-key auth), the login page, the health check, and the
+    # read-only /api/v1/ endpoints, which check a Bearer token or session themselves (JSON 401).
     "django.contrib.auth.middleware.LoginRequiredMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

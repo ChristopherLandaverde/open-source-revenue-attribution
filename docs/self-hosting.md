@@ -96,6 +96,20 @@ docker compose -f compose.production.yml exec -e DJANGO_SUPERUSER_PASSWORD='<pas
 at `/admin/` (superusers only). Every signed-in user sees all data: there are no roles or
 per-workspace permissions yet.
 
+### API tokens for agents and scripts
+
+The read-only JSON API at `/api/v1/` (fields and examples in the
+[README](../README.md#use-it-from-an-agent--api)) takes a per-user Bearer token:
+
+```sh
+docker compose -f compose.production.yml exec app python manage.py createapitoken admin --name agent
+curl -H "Authorization: Bearer <token>" https://<your domain>/api/v1/readiness
+```
+
+The token is printed once and only its SHA-256 hash is stored. It reads everything its user
+can see and cannot write. Revoke it in Django admin under API tokens (delete it); deactivating
+the user also stops its tokens.
+
 ### Try it with the demo data
 
 ```sh
@@ -281,6 +295,7 @@ with production-like settings.
 | SDK demo page off | leave `COLLECT_DEMO_PAGE` unset | `osra.W003` |
 | PostgreSQL, not SQLite | the compose stack | `osra.W004` |
 | Admin accounts | strong passwords, Django's validators enforce length and common-password rules | `createsuperuser` |
+| API tokens | one per agent or script, deleted in the admin when no longer used; sent only over HTTPS | `createapitoken` |
 
 The database port is not published, the app runs as a non-root user, and `.env` is excluded
 from the image (`.dockerignore`).
