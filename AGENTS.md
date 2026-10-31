@@ -65,8 +65,9 @@ no React/Vite) · Django ORM + migrations on PostgreSQL · pytest + pytest-djang
   client of `/api/v1/` only: it imports no Django or app code (`tests/test_architecture.py`),
   returns the API's JSON unchanged, and sends requests only to `OSRA_URL`. `mcp` is pinned
   exactly; upgrade it on purpose. New tools are read-only and go through the API.
-- **HubSpot import:** `reports/hubspot.py` is GET-only against api.hubapi.com
-  (`tests/test_hubspot_import.py` fails on any other request) and maps HubSpot records to the
+- **HubSpot import:** `reports/hubspot.py` is GET-only against api.hubapi.com, `/crm/` paths
+  plus exactly `/account-info/2026-09/details`, no redirects (`tests/test_hubspot_import.py`
+  fails on any other request) and maps HubSpot records to the
   CSV contract's rows. It never adds a parallel validation or load path: `run_import` loads.
   Its tests use synthetic responses in HubSpot's documented shapes, never real portal data.
 - **API:** `/api/v1/` is read-only (GET and HEAD; other methods 405) and only reshapes what

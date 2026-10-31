@@ -45,7 +45,20 @@ DEAL_PROPERTIES = (
     "hs_is_closed_lost",
 )
 
-urlopen = urllib.request.urlopen  # module attribute, so tests can replace the network
+# The one read outside /crm/: the portal's company currency, for deals without a currency
+# (Dreamdata's documented fallback). It needs no scope.
+ACCOUNT_DETAILS_PATH = "/account-info/2026-09/details"
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never follow a redirect: the Authorization header must not leave api.hubapi.com."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None  # urllib then raises HTTPError for the 3xx
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+urlopen = _OPENER.open  # module attribute, so tests can replace the network
 
 
 class HubSpotError(Exception):
@@ -63,9 +76,11 @@ class HubSpotClient:
         self.requests = 0
 
     def get(self, path: str, params: dict[str, str] | None = None) -> dict:
-        """GET a CRM path on api.hubapi.com and return its JSON body."""
-        if not path.startswith("/crm/"):
-            raise HubSpotError(f"Refusing to read {path!r}: only /crm/ paths are read.")
+        """GET a CRM path (or the account details path) on api.hubapi.com; return its JSON."""
+        if not path.startswith("/crm/") and path != ACCOUNT_DETAILS_PATH:
+            raise HubSpotError(
+                f"Refusing to read {path!r}: only /crm/ paths and {ACCOUNT_DETAILS_PATH} are read."
+            )
         url = f"{API}{path}" + (f"?{urlencode(params)}" if params else "")
         request = urllib.request.Request(
             url,
@@ -154,6 +169,11 @@ def _explain(status: int, message: str, path: str) -> str:
             f"HubSpot refused access to {path} (403). The token needs the read scopes "
             f"{', '.join(SCOPES)}.{detail}"
         )
+    if 300 <= status < 400:
+        return (
+            f"HubSpot redirected {path} ({status}). Redirects are not followed, so the token "
+            f"is only ever sent to {API_HOST}.{detail}"
+        )
     if status == 429:
         return f"HubSpot kept rate-limiting the import (429) after {MAX_RETRIES} retries.{detail}"
     return f"HubSpot answered {status} for {path}.{detail}"
@@ -168,10 +188,15 @@ class HubSpotData:
     contacts: list[dict]
     deals: list[dict]
     requests: int = 0
+    company_currency: str = ""  # the portal's currency, read only when a deal has none
 
 
-def fetch(client: HubSpotClient) -> HubSpotData:
-    """Read companies, contacts (with their companies) and deals (with companies and contacts)."""
+def fetch(client: HubSpotClient, company_currency: bool = True) -> HubSpotData:
+    """Read companies, contacts (with their companies) and deals (with companies and contacts).
+
+    With `company_currency`, and only if a deal has no `deal_currency_code`, also read the
+    portal's company currency (single-currency portals leave the deal property empty).
+    """
     companies = client.list_objects("companies", COMPANY_PROPERTIES)
     contacts = client.list_objects("contacts", CONTACT_PROPERTIES, ("companies",))
     deals = client.list_objects("deals", DEAL_PROPERTIES, ("companies", "contacts"))
@@ -182,7 +207,12 @@ def fetch(client: HubSpotClient) -> HubSpotData:
                 target = _target_type(to_type, block)
                 full = client.associations(from_type, record["id"], target)
                 record["associations"][to_type] = {"results": _from_v4(from_type, target, full)}
-    return HubSpotData(companies, contacts, deals, client.requests)
+    currency = ""
+    if company_currency and any(
+        not ((d.get("properties") or {}).get("deal_currency_code") or "").strip() for d in deals
+    ):
+        currency = str(client.get(ACCOUNT_DETAILS_PATH).get("companyCurrency") or "").strip()
+    return HubSpotData(companies, contacts, deals, client.requests, currency)
 
 
 def _target_type(key: str, block: dict) -> str:
@@ -215,6 +245,7 @@ class Mapping:
 
     batch: ImportBatch
     notes: list[str] = field(default_factory=list)
+    lost_ids: list[str] = field(default_factory=list)  # closed-lost deals (refused for now)
 
 
 def _associated(record: dict, kind: str) -> tuple[list[str], list[str]]:
@@ -279,7 +310,8 @@ def to_batch(
         contacts.append(
             {"contact_id": str(c["id"]), "account_id": account, "email": props.get("email") or ""}
         )
-    opportunities, several, lost, defaulted = [], 0, 0, 0
+    opportunities, several, elsewhere, lost_ids = [], 0, 0, []
+    from_flag = from_portal = 0
     for d in data.deals:
         props = d.get("properties") or {}
         account = _company(d)
@@ -287,11 +319,16 @@ def to_batch(
         if len(deal_contacts) > 1:
             several += 1
         contact = _choose_contact(deal_contacts, account, contact_company, contact_created)
+        if deal_contacts and not contact:
+            elsewhere += 1
         stage = _stage(props)
-        lost += stage == "lost"
+        if stage == "lost":
+            lost_ids.append(str(d["id"]))
         currency = (props.get("deal_currency_code") or "").strip()
         if not currency and default_currency:
-            currency, defaulted = default_currency, defaulted + 1
+            currency, from_flag = default_currency, from_flag + 1
+        elif not currency and data.company_currency:
+            currency, from_portal = data.company_currency, from_portal + 1
         opportunities.append(
             {
                 "opportunity_id": str(d["id"]),
@@ -312,36 +349,51 @@ def to_batch(
         )
     if several:
         notes.append(
-            f"{several} deals have more than one contact; each uses one contact (its company's "
-            "contact first, then the earliest created). The others are not credited."
+            f"{several} deals have more than one contact; each uses its company's earliest "
+            "created contact. The others are not credited."
         )
-    if lost:
+    if elsewhere:
         notes.append(
-            f"{lost} closed-lost deals are passed on as stage 'lost', which the contract refuses "
-            "for now (INVALID_STAGE)."
+            f"{elsewhere} deals have contacts only at other companies; they load with no contact, "
+            "so their full amount is Unattributed."
         )
-    if defaulted:
-        notes.append(f"{defaulted} deals had no currency and use --currency {default_currency}.")
+    if lost_ids:
+        notes.append(
+            f"{len(lost_ids)} closed-lost deals are passed on as stage 'lost', which the contract "
+            "refuses for now (INVALID_STAGE)."
+        )
+    if from_flag:
+        notes.append(f"{from_flag} deals had no currency and use --currency {default_currency}.")
+    if from_portal:
+        notes.append(
+            f"{from_portal} deals had no currency and use the portal's company currency "
+            f"{data.company_currency}."
+        )
     tables = ImportBatch.from_rows(
         accounts=accounts, contacts=contacts, opportunities=opportunities, touchpoints=[]
     ).tables
     if touchpoints is not None:
         tables["touchpoints"] = touchpoints
-    return Mapping(ImportBatch(tables), notes)
+    return Mapping(ImportBatch(tables), notes, lost_ids)
 
 
 def _choose_contact(
     contact_ids: list[str], account: str, company_of: dict[str, str], created: dict[str, str]
 ) -> str:
-    """One contact per deal: one of the deal company's contacts first, then the earliest created,
-    then the lowest ID. A deal with no contact stays contactless (fully Unattributed)."""
+    """One contact per deal: the deal company's earliest created contact (then the lowest ID).
+
+    A deal whose contacts all belong to other companies gets no contact, so it loads fully
+    Unattributed instead of being refused (CONTACT_ACCOUNT_MISMATCH). A deal with no company is
+    refused anyway; it keeps its earliest contact so the report shows which one.
+    """
+    if account:
+        contact_ids = [c for c in contact_ids if company_of.get(c) == account]
     if not contact_ids:
         return ""
 
     def key(contact_id: str):
-        same_company = bool(account) and company_of.get(contact_id) == account
         numeric = int(contact_id) if contact_id.isdigit() else float("inf")
         when = parse_timestamp(created.get(contact_id) or "")[0]
-        return (not same_company, when is None, when or 0, numeric, contact_id)
+        return (when is None, when or 0, numeric, contact_id)
 
     return min(contact_ids, key=key)

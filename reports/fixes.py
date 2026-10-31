@@ -8,6 +8,14 @@ from contracts import RejectReason, WarningCode
 
 R, W = RejectReason, WarningCode
 
+# Where a fix differs for an import read from HubSpot (ImportRun.source starts with "HubSpot").
+HUBSPOT_FIXES: dict[str, str] = {
+    R.INVALID_STAGE: (
+        "Closed-lost deals aren't supported yet; nothing to change in HubSpot. Tracked in "
+        "issue #22."
+    ),
+}
+
 FIXES: dict[str, str] = {
     R.MISSING_FILE: "Add the file to the import. Upload all four CSVs together.",
     R.MISSING_COLUMN: "Add the column to the header row, spelled exactly as in the contract.",

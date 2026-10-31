@@ -19,7 +19,8 @@ does. How releases are made: [docs/release.md](docs/release.md).
   read-only token (`HUBSPOT_TOKEN`; scopes `crm.objects.companies.read`,
   `crm.objects.contacts.read`, `crm.objects.deals.read`) and imports them through the same
   validation and load as the CSV import. `--dry-run` writes nothing. GET requests to
-  api.hubapi.com only. Fixture-verified; not yet run against a real HubSpot portal. No report
+  api.hubapi.com only. A deal without a currency uses the portal's company currency. The
+  validation page shows import notes, including loaded deals that are now closed-lost (#22). Fixture-verified; not yet run against a real HubSpot portal. No report
   number changes for existing data.
 - **Read-only JSON API.** `GET /api/v1/attribution`, `/api/v1/journeys/<opportunity or account
   id>` and `/api/v1/readiness` return the report, journey and readiness pages' numbers as JSON

@@ -69,6 +69,7 @@ class FakeHubSpot:
         self.token = token
         self.requests = []
         self.v4 = {}  # (from_type, id, to_type) -> v4 association rows
+        self.account = {"companyCurrency": "USD", "additionalCurrencies": [], "portalId": 1}
 
     def __call__(self, request, timeout=None):
         url = urlsplit(request.full_url)
@@ -85,11 +86,28 @@ class FakeHubSpot:
             )
         assert request.get_header("Authorization") == f"Bearer {self.token}"
         query = {k: v[0] for k, v in parse_qs(url.query).items()}
+        if url.path == "/account-info/2026-09/details":
+            return FakeResponse(json.dumps(self.account).encode())
         if m := re.fullmatch(r"/crm/v3/objects/(companies|contacts|deals)", url.path):
-            return self._page(self.portal[m.group(1)], query, inline=True)
+            records = [self._shape(r, query) for r in self.portal[m.group(1)]]
+            return self._page(records, query, inline=True)
         if m := re.fullmatch(r"/crm/v4/objects/(\w+)/(\d+)/associations/(\w+)", url.path):
             return self._page(self.v4[m.groups()], query, inline=False)
         raise AssertionError(f"unexpected path {url.path}")
+
+    @staticmethod
+    def _shape(record, query):
+        """As HubSpot does: only the requested properties (plus hs_object_id), and associations
+        only for the requested object types."""
+        wanted = set(query.get("properties", "").split(",")) | {"hs_object_id"}
+        props = {k: v for k, v in record["properties"].items() if k in wanted}
+        shaped = {**record, "properties": props}
+        shaped.pop("associations", None)
+        types = [t for t in query.get("associations", "").split(",") if t]
+        blocks = {k: v for k, v in (record.get("associations") or {}).items() if k in types}
+        if blocks:
+            shaped["associations"] = blocks
+        return shaped
 
     def _page(self, records, query, inline):
         assert int(query["limit"]) <= 500
@@ -134,6 +152,10 @@ def equivalent_csvs(directory: Path) -> Path:
             if first in NOT_IN_HUBSPOT.get(name, []) or line in seen:
                 continue  # also drops the exact duplicate contact row
             seen.add(line)
+            if first == "opp-109":
+                # Its only contact is at another company: the HubSpot import loads it with no
+                # contact (Unattributed) instead of refusing it (docs/decisions.md).
+                line = line.replace(",con-um-sam,", ",,")
             lines.append(translate(line))
         (directory / name).write_text("\n".join(lines) + "\n")
     return directory
@@ -225,14 +247,15 @@ def test_hubspot_equals_the_equivalent_csv_import(client, fake, tmp_path):
     assert from_hubspot[1] == from_csv[1]  # identical validation outcome
     assert from_hubspot[2] == from_csv[2]  # identical report numbers, journeys and readiness
     # The comparison is not vacuous: the demo's numbers are there.
-    assert len(from_csv[0]["opportunities"]) == 6 and len(from_csv[0]["touchpoints"]) == 15
+    assert len(from_csv[0]["opportunities"]) == 7 and len(from_csv[0]["touchpoints"]) == 15
     usd = next(
         c for c in from_hubspot[2]["attribution pipeline"]["currencies"] if c["currency"] == "USD"
     )
-    assert usd["total"] == "54000.00"
+    assert usd["total"] == "61000.00"  # the demo's 54000.00 plus 9109 (7000.00, contactless)
     assert ImportRun.objects.get().source == "HubSpot (api.hubapi.com)"
     assert "Read 4 companies, 8 contacts and 9 deals from api.hubapi.com" in out
     assert "9107" in err and "AMOUNT_PRECISION" in err
+    assert "account-info" not in " ".join(u for _, u in fake.requests)  # every deal has a currency
 
 
 # --- Read-only: no write request, ever ------------------------------------------------
@@ -244,7 +267,8 @@ def test_only_get_requests_are_sent(fake, tmp_path):
     assert fake.requests and {m for m, _ in fake.requests} == {"GET"}
     for _, url in fake.requests:
         assert urlsplit(url).hostname == "api.hubapi.com"
-        assert urlsplit(url).path.startswith(("/crm/v3/objects/", "/crm/v4/objects/"))
+        path = urlsplit(url).path
+        assert path.startswith(("/crm/v3/objects/", "/crm/v4/objects/"))
 
 
 def test_the_client_has_no_write_method():
@@ -380,9 +404,9 @@ def test_dry_run_prints_the_report_and_writes_nothing(fake, tmp_path):
     out, err = run(dry_run=True, touchpoints=equivalent_csvs(tmp_path / "csv") / "touchpoints.csv")
     assert {m.__name__: m.objects.count() for m in models} == before
     assert "Validated HubSpot (api.hubapi.com)" in out
-    assert "Dry run: would load 4 accounts, 7 contacts, 6 opportunities, 15 touchpoints" in out
+    assert "Dry run: would load 4 accounts, 7 contacts, 7 opportunities, 15 touchpoints" in out
     assert "Nothing was written." in out
-    assert "WON_AT_REQUIRED" in err and "CONTACT_ACCOUNT_MISMATCH" in err
+    assert "WON_AT_REQUIRED" in err and "CONTACT_ACCOUNT_MISMATCH" not in err
 
 
 # --- Mapping choices (docs/decisions.md) -------------------------------------------------
@@ -441,16 +465,147 @@ def test_company_falls_back_to_the_only_association_and_otherwise_stays_blank():
     assert out["9102"]["account_id"] == ""  # ambiguous: refused, not guessed
 
 
-def test_missing_currency_uses_the_flag_or_is_refused():
-    portal = copy.deepcopy(PORTAL)
-    portal["deals"][0]["properties"]["deal_currency_code"] = None
-    assert rows(mapped(portal), "opportunities")["9101"]["currency"] == ""
-    mapping = mapped(portal, default_currency="USD")
-    assert rows(mapping, "opportunities")["9101"]["currency"] == "USD"
-    assert any("--currency USD" in n for n in mapping.notes)
+def without_currency(fake, *deal_ids):
+    for deal in fake.portal["deals"]:
+        if deal["id"] in deal_ids:
+            deal["properties"]["deal_currency_code"] = None
+
+
+def account_info_calls(fake):
+    return [u for _, u in fake.requests if urlsplit(u).path.startswith("/account-info/")]
+
+
+def test_deal_without_currency_uses_the_portals_company_currency(fake):
+    """Single-currency portals leave deal_currency_code empty (Dreamdata: account currency)."""
+    without_currency(fake, "9101", "9102")
+    fake.account["companyCurrency"] = "USD"
+    out, err = run()
+    assert Opportunity.objects.get(external_id="9101").currency == "USD"
+    assert "2 deals had no currency and use the portal's company currency USD" in out
+    (url,) = account_info_calls(fake)  # read once, and only because a deal had no currency
+    assert urlsplit(url).path == hubspot.ACCOUNT_DETAILS_PATH and not urlsplit(url).query
+
+
+def test_currency_flag_overrides_the_portal_currency_without_reading_it(fake):
+    without_currency(fake, "9101")
+    fake.account["companyCurrency"] = "EUR"
+    out, _ = run(currency="USD")
+    assert Opportunity.objects.get(external_id="9101").currency == "USD"
+    assert "1 deals had no currency and use --currency USD" in out
+    assert account_info_calls(fake) == []
+    assert Opportunity.objects.get(external_id="9105").currency == "EUR"  # own code kept
+
+
+def test_no_currency_anywhere_is_refused(fake):
+    without_currency(fake, "9101")
+    fake.account["companyCurrency"] = ""
+    _, err = run(dry_run=True)
+    assert "[9101]: MISSING_REQUIRED_FIELD currency" in err
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/account-info/2026-09/usage",
+        "/account-info/v3/details",
+        "/account-info/2026-09/details/x",
+        "/settings/v3/users",
+    ],
+)
+def test_only_the_one_account_info_path_is_allowed(path):
+    with pytest.raises(hubspot.HubSpotError, match="Refusing to read"):
+        hubspot.HubSpotClient(TOKEN).get(path)
 
 
 def test_without_touchpoints_the_file_is_empty_not_missing(fake):
     out, err = run(dry_run=True)
     assert "MISSING_FILE" not in err
     assert "15 touchpoints" not in out and "0 touchpoints" in out
+
+
+def test_a_deal_whose_contacts_are_all_elsewhere_loads_with_no_contact(fake):
+    out, err = run()
+    deal = Opportunity.objects.get(external_id="9109")  # its only contact, 7005, is at 5002
+    assert deal.account.external_id == "5001" and deal.contact is None
+    assert "1 deals have contacts only at other companies" in out
+    assert "CONTACT_ACCOUNT_MISMATCH" not in err
+    assert "9109" in [w["record_id"] for w in ImportRun.objects.get().report["warnings"]]
+
+
+# --- A deal loaded earlier that is now closed-lost ----------------------------------------
+
+
+def test_loaded_deal_now_closed_lost_is_reported_and_kept(client, fake):
+    run()
+    assert Opportunity.objects.get(external_id="9102").stage == "open"
+    deal = next(d for d in fake.portal["deals"] if d["id"] == "9102")
+    deal["properties"].update(dealstage="closedlost", hs_is_closed_lost="true")
+    count = Opportunity.objects.count()
+
+    out, err = run()
+    expected = (
+        "1 deals already loaded are now closed-lost and still count as open pipeline (9102). "
+        "Nothing was deleted; supporting the lost stage is tracked in #22."
+    )
+    assert expected in out
+    assert "[9102]: INVALID_STAGE stage" in err
+    assert Opportunity.objects.count() == count  # nothing deleted
+    assert Opportunity.objects.get(external_id="9102").stage == "open"  # unchanged, as reported
+    run_ = ImportRun.objects.first()
+    assert expected in run_.report["notes"]
+
+    page = client.get("/validation/").content.decode()
+    assert "Import notes" in page and "still count as open pipeline (9102)" in page
+    assert "nothing to change in HubSpot" in page and "Fix them in HubSpot" in page
+
+    dry, _ = run(dry_run=True)
+    assert expected in dry
+
+
+def test_a_csv_import_keeps_the_csv_fix_copy(client):
+    call_command("load_sample_data", stdout=io.StringIO(), stderr=io.StringIO())
+    page = client.get("/validation/").content.decode()
+    assert "Fix them in the CSV" in page and "Import notes" not in page
+
+
+# --- Redirects are never followed -------------------------------------------------------
+
+
+def test_the_opener_does_not_follow_redirects():
+    """A real urllib round trip on a local server: the 302 is not followed."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    hits = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            hits.append((self.path, self.headers.get("Authorization")))
+            self.send_response(302)
+            self.send_header("Location", "/elsewhere")
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{server.server_port}/crm/v3/objects/deals",
+            headers={"Authorization": "Bearer secret"},
+        )
+        with pytest.raises(urllib.error.HTTPError) as error:
+            hubspot._OPENER.open(request, timeout=5)
+        assert error.value.code == 302
+        assert [p for p, _ in hits] == ["/crm/v3/objects/deals"]  # /elsewhere never requested
+    finally:
+        server.shutdown()
+
+
+def test_a_redirect_is_a_clear_error(fake):
+    fake.failures = [(301, {"Location": "https://evil.example/"}, {})]
+    with pytest.raises(CommandError, match=r"redirected .*not followed.*api\.hubapi\.com"):
+        run()
+    assert len(fake.requests) == 1

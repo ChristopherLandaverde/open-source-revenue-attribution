@@ -14,6 +14,7 @@ from django.core.management.base import BaseCommand, CommandError
 from contracts import ImportBatch, validate_import
 from reports.hubspot import API_HOST, SCOPES, HubSpotClient, HubSpotError, fetch, to_batch
 from reports.imports import describe_report, run_import
+from reports.models import Opportunity
 
 SOURCE = f"HubSpot ({API_HOST})"
 
@@ -46,7 +47,7 @@ class Command(BaseCommand):
             "--currency",
             default="",
             help="Currency for deals with no currency (deal_currency_code), e.g. USD. Without "
-            "it such deals are refused (MISSING_REQUIRED_FIELD currency).",
+            "it, such deals use the portal's company currency from HubSpot.",
         )
 
     def handle(self, *args, dry_run, strict, touchpoints, currency, **options):
@@ -64,15 +65,16 @@ class Command(BaseCommand):
             touch_table = ImportBatch.from_csv_texts({"touchpoints": text}).tables["touchpoints"]
 
         try:
-            data = fetch(HubSpotClient(token))
+            data = fetch(HubSpotClient(token), company_currency=not currency.strip())
         except HubSpotError as exc:
             raise CommandError(f"{exc} Nothing was written.") from None
         mapping = to_batch(data, touch_table, default_currency=currency.strip())
+        notes = [*mapping.notes, *_loaded_now_lost(mapping.lost_ids)]
         self.stdout.write(
             f"Read {len(data.companies)} companies, {len(data.contacts)} contacts and "
             f"{len(data.deals)} deals from {API_HOST} in {data.requests} GET requests."
         )
-        for note in mapping.notes:
+        for note in notes:
             self.stdout.write(f"  {note}")
         self.stdout.write(
             "Rows are numbered in the order HubSpot returned them; the ID in brackets is the "
@@ -94,7 +96,7 @@ class Command(BaseCommand):
             )
             return
 
-        result = run_import(mapping.batch, source=SOURCE, strict=strict)
+        result = run_import(mapping.batch, source=SOURCE, strict=strict, notes=notes)
         describe_report(self, result.report, SOURCE)
         if not result.run.loaded:
             raise CommandError(
@@ -109,3 +111,25 @@ class Command(BaseCommand):
                 f"from {SOURCE}. Full validation report: /validation/"
             )
         )
+
+
+LOST_STAGE_ISSUE = "#22"
+
+
+def _loaded_now_lost(lost_ids: list[str]) -> list[str]:
+    """Deals loaded by an earlier import that HubSpot now has as closed-lost.
+
+    The contract refuses the lost stage, so their refused rows never update the loaded
+    opportunity: it keeps its last imported stage. Nothing is deleted; this says so.
+    """
+    loaded = Opportunity.objects.filter(external_id__in=lost_ids).order_by("external_id")
+    notes = []
+    for stage, counted_as in [("open", "open pipeline"), ("won", "won revenue")]:
+        ids = [o.external_id for o in loaded if o.stage == stage]
+        if ids:
+            notes.append(
+                f"{len(ids)} deals already loaded are now closed-lost and still count as "
+                f"{counted_as} ({', '.join(ids)}). Nothing was deleted; supporting the lost "
+                f"stage is tracked in {LOST_STAGE_ISSUE}."
+            )
+    return notes
