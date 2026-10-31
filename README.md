@@ -141,10 +141,10 @@ under API tokens.
 ```console
 $ uv run python manage.py createapitoken admin --name agent
 Created API token 'agent' for 'admin'.
-Token: osra_enx_YAtOVpL06OuBqLovbReqKnBYhTVyYDDquQ46NlM
+Token: osra_…
 Copy it now; it is not shown again. Send it as:
   Authorization: Bearer <token>
-$ export OSRA_TOKEN=osra_enx_YAtOVpL06OuBqLovbReqKnBYhTVyYDDquQ46NlM
+$ export OSRA_TOKEN=osra_…
 ```
 
 (That token is from a throwaway local database; yours will differ.)
@@ -233,7 +233,8 @@ curl -s -H "Authorization: Bearer $OSRA_TOKEN" http://127.0.0.1:8000/api/v1/read
 
 Without a valid token or session the API answers `401` with
 `{"schemaVersion": "1", "error": {"code": "not_authenticated", …}}` and no data. Any method
-other than GET or HEAD gets `405`. Amounts are strings at the currency's minor unit (`"1200000"` for
+other than GET or HEAD gets `405`.
+Amounts are strings at the currency's minor unit (`"1200000"` for
 JPY), and times are ISO 8601 in UTC. There is no MCP server yet; it is the next step.
 
 ## What you get
