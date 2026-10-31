@@ -166,9 +166,9 @@ event must carry to be accepted. Field names are RudderStack's.
 
 | | |
 |---|---|
-| Paths | `POST /v1/batch` with `{"batch": [event, ...]}` (at most `COLLECT_MAX_BATCH`, default 500), or `POST /v1/page`, `/v1/track`, `/v1/identify` with one event. The event's own `type` decides; the path does not. |
+| Paths | `POST /v1/batch` with `{"batch": [event, ...]}` or a bare JSON array `[event, ...]` (at most `COLLECT_MAX_BATCH`, default 500), or `POST /v1/page`, `/v1/track`, `/v1/identify` with one event. Both batch shapes use identical per-event validation, ordering and deduplication. The event's own `type` decides; the path does not. |
 | Auth | `Authorization: Basic base64(<write key>:)`, as the SDK sends it. A write key belongs to a workspace (`manage.py create_workspace`). Write keys are visible in browser code; they identify the sender, they are not secrets. |
-| Response | `200` with counts and one outcome per event in order: `accepted`, `duplicate` or `rejected`, with its codes. `401` missing or unknown key, `400` body is not a JSON object/batch, `413` too many events. Refused events still get `200`: the SDK does not retry 4xx, and a refused event will not become valid by retrying. |
+| Response | `200` with counts and one outcome per event in order: `accepted`, `duplicate` or `rejected`, with its codes. Empty batches return zero counts. `401` missing or unknown key, `400` batch body is neither a JSON array nor an object with a `batch` list, `413` too many events. Refused events still get `200`: the SDK does not retry 4xx, and a refused event will not become valid by retrying. |
 | Storage | Every distinct payload is stored verbatim with its outcome (`collection.CollectedEvent`). Accepted events are unique by `messageId`; refused payloads by content. Exact repeats increment a counter, so replaying the same data never adds rows. |
 | Scope | All workspaces write to one dataset (no per-workspace isolation), and `messageId` is unique across it. Pages on other sites may send from the browser (CORS); `COLLECT_ALLOWED_ORIGINS` can limit them to listed origins ([self-hosting](self-hosting.md#send-events-from-your-site)). |
 

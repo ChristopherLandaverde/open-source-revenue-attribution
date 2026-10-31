@@ -29,10 +29,8 @@ Two questions:
   and the **HTTP Webhook** destination with batching off. Put the write key in a Basic
   `Authorization` header (Webhook) or in Basic Auth's Username (HTTP Webhook). Event time comes
   from the `timestamp` that rudder-server sets, used as is.
-- **HTTP Webhook with batching on doesn't work:** it sends a bare JSON array, and `/v1/batch`
-  takes only `{"batch": [...]}`. Changing that changes the collection contract, so it's
-  [issue #16](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/16)
-  (`needs-decision`). No code was changed for it.
+- **HTTP Webhook with batching on works:** it sends a bare JSON array, which `/v1/batch` accepts
+  alongside the existing `{"batch": [...]}` shape (Decision A, 2026-10-30; issue #16).
 
 ## 1. The JavaScript SDK and a custom data plane
 
@@ -153,7 +151,7 @@ like personal data were swapped for `*.example` ones.
 |---|---|
 | Webhook, POST, URL `…/v1/track`, header `Authorization: Basic base64(<write key>:)` | **Accepted.** `/v1/page`, `/v1/track` and `/v1/identify` each take any event type: the event's `type` decides. Time from `timestamp`; the payload is stored verbatim. |
 | HTTP Webhook, POST, JSON, payload as is, batching off, Basic Auth Username = write key | **Accepted.** We read only the username, so an empty, `undefined` or any other password works. Write key as the *password* with an empty username → `401`. |
-| HTTP Webhook with **Enable Batching** | **Not accepted.** `/v1/batch` → `400`; a single-event path → `200` with the array refused (`MISSING_REQUIRED_FIELD`). Nothing stored. [Issue #16](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/16). |
+| HTTP Webhook with **Enable Batching** | **Accepted.** `/v1/batch` accepts its bare JSON array, with per-event validation and deduplication. |
 | Webhook with GET or DELETE | Not supported: `/v1/` is POST only (`405`), and those methods send no event body. |
 | Same event delivered twice (a retry) | Counted once (`duplicate`, `times_received = 2`). |
 | `COLLECT_ALLOWED_ORIGINS` set to a list | Doesn't apply: server-to-server requests send no `Origin`. |
@@ -163,8 +161,8 @@ Refused events still get `200`, as for the SDK (contract §3), so a refusal is n
 Bad or missing write keys get `401`. How RudderStack treats each status (retry or drop) was not
 checked for this note.
 
-**Volume.** One event per request means one touchpoint recompute per forwarded event (README,
-Known limits). That is fine at demo volume and is part of the case for option A in issue #16.
+**Volume.** Batching reduces the number of requests and touchpoint recomputations for forwarded
+events. Single-event delivery still recomputes touchpoints per request (README, Known limits).
 
 ## Not verified
 
