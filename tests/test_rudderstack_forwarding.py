@@ -250,12 +250,14 @@ def test_http_webhook_write_key_as_password_is_401(anon_client, workspace):
     assert response.status_code == 401
 
 
-def test_http_webhook_batch_array_is_not_accepted_by_v1_batch(anon_client, workspace):
-    """Known gap: batching sends `[{Event1},...,{EventN}]`; /v1/batch wants {"batch": [...]}."""
+def test_http_webhook_batch_array_is_accepted_by_v1_batch(anon_client, workspace):
+    """HTTP Webhook batching sends `[{Event1},...,{EventN}]`."""
     batch = [as_delivered(DOCS_IDENTIFY), as_delivered(DOCS_TRACK)]
     response = webhook_post(anon_client, "/v1/batch", batch, basic(KEY))
-    assert response.status_code == 400
-    assert not CollectedEvent.objects.exists()
+    assert response.status_code == 200
+    assert response.json()["received"] == 2
+    assert [event["outcome"] for event in response.json()["events"]] == ["accepted", "accepted"]
+    assert CollectedEvent.objects.filter(status="accepted").count() == 2
 
 
 def test_http_webhook_batch_array_on_a_single_event_path_is_refused(anon_client, workspace):
@@ -264,3 +266,42 @@ def test_http_webhook_batch_array_on_a_single_event_path_is_refused(anon_client,
     assert result["outcome"] == "rejected"
     assert result["issues"][0]["code"] == "MISSING_REQUIRED_FIELD"
     assert not CollectedEvent.objects.filter(status="accepted").exists()
+
+
+@pytest.mark.parametrize("batch", [[], {"batch": []}])
+def test_empty_batch_shapes_return_the_same_zero_counts(anon_client, workspace, batch):
+    response = webhook_post(anon_client, "/v1/batch", batch, basic(KEY))
+    assert response.status_code == 200
+    assert response.json() == {
+        "received": 0,
+        "accepted": 0,
+        "duplicates": 0,
+        "rejected": 0,
+        "events": [],
+    }
+
+
+def test_http_webhook_batch_array_validates_each_item_independently(anon_client, workspace):
+    valid = as_delivered(DOCS_TRACK)
+    invalid = {**as_delivered(DOCS_IDENTIFY), "userId": ""}
+    response = webhook_post(anon_client, "/v1/batch", [valid, invalid], basic(KEY))
+    assert response.status_code == 200
+    assert [event["outcome"] for event in response.json()["events"]] == ["accepted", "rejected"]
+    assert response.json()["events"][1]["issues"][0]["code"] == "MISSING_REQUIRED_FIELD"
+    assert CollectedEvent.objects.count() == 2
+
+
+def test_same_events_deduplicate_across_batch_body_shapes(anon_client, workspace):
+    event = as_delivered(DOCS_TRACK)
+    first = webhook_post(anon_client, "/v1/batch", [event], basic(KEY))
+    second = webhook_post(anon_client, "/v1/batch", {"batch": [event]}, basic(KEY))
+    assert first.json()["events"][0]["outcome"] == "accepted"
+    assert second.json()["events"][0]["outcome"] == "duplicate"
+    assert CollectedEvent.objects.get().times_received == 2
+
+
+@pytest.mark.parametrize("body", [None, "hello", 1, {"batch": {}}, {"events": []}])
+def test_batch_rejects_values_other_than_array_or_batch_object(anon_client, workspace, body):
+    response = webhook_post(anon_client, "/v1/batch", body, basic(KEY))
+    assert response.status_code == 400
+    assert not CollectedEvent.objects.exists()

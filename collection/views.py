@@ -146,9 +146,15 @@ def _collect(request, kind: str) -> JsonResponse:
     except (ValueError, UnicodeDecodeError):
         return _error(400, "The request body is not valid UTF-8 JSON.")
     if kind == "batch":
-        if not isinstance(body, dict) or not isinstance(body.get("batch"), list):
-            return _error(400, 'A batch request needs a JSON object with a "batch" list.')
-        payloads = body["batch"]
+        if isinstance(body, list):
+            payloads = body
+        elif isinstance(body, dict) and isinstance(body.get("batch"), list):
+            payloads = body["batch"]
+        else:
+            return _error(
+                400,
+                'A batch request needs a JSON array or an object with a "batch" list.',
+            )
     else:
         payloads = [body]
     if len(payloads) > settings.COLLECT_MAX_BATCH:

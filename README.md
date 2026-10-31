@@ -166,9 +166,6 @@ Details for every row: [docs/how-it-works.md](docs/how-it-works.md).
   contacts links to neither. Rules: [contract §3](docs/contract.md#from-events-to-touchpoints).
 - **Touchpoints are recomputed from all events** on every collection request; fine for demo
   volumes, not tuned for large ones.
-- **RudderStack forwarding is one event per request.** The HTTP Webhook destination's batching
-  sends a bare JSON array, which `/v1/batch` doesn't accept yet
-  ([#16](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/16)).
 - **Journeys are per opportunity contact.** The page lists the account's other contacts but
   does not combine them into an account journey yet.
 - **Stages are `open` and `won` only**; mixed currencies are reported side by side, never summed.

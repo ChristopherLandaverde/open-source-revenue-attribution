@@ -229,9 +229,8 @@ run from a live RudderStack workspace**. Research and sources:
 
    Or use the **HTTP Webhook** destination: Base URL as above, Authentication **Basic Auth**
    with Username = the write key (not base64; the password is ignored), Method `POST`, Body Format
-   `JSON`, **Send the event payload as is** on, and **Enable Batching off**. With batching on,
-   RudderStack sends a bare JSON array, which this server does not accept yet
-   ([issue #16](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/16)).
+   `JSON`, and **Send the event payload as is** on. **Enable Batching** may be on or off; batched
+   delivery sends a bare JSON array accepted by `/v1/batch`.
 
 3. Send a few events, then open **Events**. Delivery errors show in the destination's
    **Live Events** tab in RudderStack.

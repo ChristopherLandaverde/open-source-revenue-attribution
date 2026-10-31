@@ -10,6 +10,9 @@ does. How releases are made: [docs/release.md](docs/release.md).
 
 ### Changed
 
+- **Batched RudderStack forwarding.** `POST /v1/batch` accepts both `{"batch": [...]}` and the
+  bare JSON array sent by the HTTP Webhook destination when batching is enabled.
+
 - **README.** Leads with the problem and a verified number from the demo data, with a proof
   GIF recorded from the running app. Event sending, the model table and the code layout moved
   to [docs/how-it-works.md](docs/how-it-works.md).
