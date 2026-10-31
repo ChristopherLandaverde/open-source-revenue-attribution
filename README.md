@@ -60,7 +60,7 @@ The engine computes every number; the server tells your agent to quote it under 
 
 Agentic levels: L1 machine-readable · L2 agent-callable · L3 live read.
 OSRA: L1 (JSON API) · L2 (`osra-mcp`) · L3 (HubSpot import, fixture-verified:
-tested against synthetic HubSpot API responses, not yet a real portal). Details: [Use it from an agent / API](#use-it-from-an-agent--api) ·
+tested against synthetic HubSpot API responses, not yet a real portal). It has no L4: nothing writes. Details: [Use it from an agent / API](#use-it-from-an-agent--api) ·
 [MCP server](#from-an-agent-over-mcp) · [Live import from HubSpot](#live-import-from-hubspot).
 
 ## Quick start
