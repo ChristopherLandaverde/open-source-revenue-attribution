@@ -1,0 +1,133 @@
+{
+  "capturedAt": "2026-10-31T01:49:25+00:00",
+  "baseUrl": "http://127.0.0.1:8000",
+  "import": {
+    "page": "/import/",
+    "button": "Import the demo data set",
+    "note": "The demo data set is synthetic and contains 10 invalid rows on purpose. Re-importing the same rows updates them by ID; nothing is duplicated.",
+    "verdict": "× REFUSED 10 rows refused. The other 32 rows were loaded.",
+    "files": [
+      "accounts.csv",
+      "contacts.csv",
+      "opportunities.csv",
+      "touchpoints.csv"
+    ],
+    "rowsReceived": 43,
+    "loaded": 32,
+    "refused": 10
+  },
+  "comparison": {
+    "page": "/?metric=pipeline",
+    "models": [
+      "First-touch",
+      "Last-touch",
+      "Linear",
+      "Position-based (U-shaped)",
+      "Time decay"
+    ],
+    "currency": "USD",
+    "context": "4 opportunities worth 54000.00 USD. Each model column adds up to that total. 9000.00 is Unattributed under every model: no eligible touch, so it is not in Influenced either.",
+    "window": "Window: No lookback cap: every touch up to the conversion · Amount: Pipeline (credited at opportunity creation)",
+    "total": "54000.00",
+    "campaigns": {
+      "google / cpc / q1-search": {
+        "First-touch": "39000.00",
+        "Last-touch": "0",
+        "Linear": "19500.00",
+        "Position-based (U-shaped)": "19500.00",
+        "Time decay": "9765.76",
+        "Influenced (overlaps)": "39000.00 2 opp."
+      },
+      "linkedin / paid-social / abm-launch": {
+        "First-touch": "0",
+        "Last-touch": "39000.00",
+        "Linear": "19500.00",
+        "Position-based (U-shaped)": "19500.00",
+        "Time decay": "29234.24",
+        "Influenced (overlaps)": "39000.00 2 opp."
+      }
+    },
+    "notice": "Each column applies one named rule to the same touches. The numbers show association under that rule, not causal impact: no column shows that a campaign caused a deal. A gap between columns is the rules' difference, not a measured lift."
+  },
+  "journey": {
+    "page": "/opportunities/opp-101/journey/?metric=pipeline",
+    "opportunity": "Northwind platform",
+    "verdict": "✓ CREDITED 2 eligible touches share the full 24000.00 USD; each model splits it differently.",
+    "contact": "Touches of con-nw-ana (oldest first)",
+    "touches": [
+      {
+        "#": "1",
+        "Time (UTC)": "2026-02-10 14:00:00",
+        "Touch": "tp-01 touchpoints.csv",
+        "Source / medium / campaign": "google / cpc / q1-search /pricing",
+        "How it became a touch": "Imported from touchpoints.csv; counted as given.",
+        "Eligibility": "✓ ELIGIBLE At or before the conversion.",
+        "First-touch": "24000.00",
+        "Last-touch": "0.00",
+        "Linear": "12000.00",
+        "Position-based (U-shaped)": "12000.00",
+        "Time decay": "2265.76"
+      },
+      {
+        "#": "2",
+        "Time (UTC)": "2026-03-05 10:00:00",
+        "Touch": "tp-02 touchpoints.csv",
+        "Source / medium / campaign": "linkedin / paid-social / abm-launch /demo",
+        "How it became a touch": "Imported from touchpoints.csv; counted as given.",
+        "Eligibility": "✓ ELIGIBLE At or before the conversion.",
+        "First-touch": "0.00",
+        "Last-touch": "24000.00",
+        "Linear": "12000.00",
+        "Position-based (U-shaped)": "12000.00",
+        "Time decay": "21734.24"
+      },
+      {
+        "#": "3",
+        "Time (UTC)": "2026-05-10 16:00:00",
+        "Touch": "tp-03 touchpoints.csv",
+        "Source / medium / campaign": "partner / referral / may-webinar /webinar",
+        "How it became a touch": "Imported from touchpoints.csv; counted as given.",
+        "Eligibility": "– AFTER CONVERSION After the conversion time.",
+        "First-touch": "—",
+        "Last-touch": "—",
+        "Linear": "—",
+        "Position-based (U-shaped)": "—",
+        "Time decay": "—"
+      }
+    ],
+    "totals": [
+      "24000.00",
+      "24000.00",
+      "24000.00",
+      "24000.00",
+      "24000.00"
+    ]
+  },
+  "readiness": {
+    "page": "/readiness/",
+    "verdict": "! FIX DATA FIRST 3 checks need a fix before you trust the numbers.",
+    "firstCheck": {
+      "title": "Opportunities have a contact",
+      "count": "5 / 6 · 83%",
+      "SEEN": "5 of 6 opportunities have a contact.",
+      "WHY": "Without a contact there are no touches, so the whole amount is Unattributed under every model.",
+      "FIX": "Fill contact_id in opportunities.csv for these opportunities, then import again.",
+      "VERIFY": "Reload this page: the count reaches the total.",
+      "RECORDS": "opp-104 · Open evidence"
+    },
+    "records": [
+      "opp-104"
+    ],
+    "noTouch": "Amount: Pipeline (credited at opportunity creation) · No lookback cap: every touch up to the conversion · 5 of 6 opportunities have an eligible touch · touches from 2025-12-01 to 2026-10-31 · conversions from 2026-03-10 to 2026-06-01"
+  },
+  "input": {
+    "touchpoints": "sample_data/demo/touchpoints.csv",
+    "opportunities": "sample_data/demo/opportunities.csv",
+    "unattributedOpportunity": {
+      "opportunity_id": "opp-104",
+      "name": "Umbra renewal",
+      "amount": "9000.00",
+      "currency": "USD"
+    }
+  }
+}

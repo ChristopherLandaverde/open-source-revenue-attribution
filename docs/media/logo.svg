@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="t">
+  <title id="t">Open Source Revenue Attribution: a revenue line traced back through three touch points</title>
+  <!-- Focosys tokens (static/css/tokens.css): --ink-primary tile, --state-verified line, --surface-paper touches. -->
+  <rect width="256" height="256" rx="56" fill="#10231F"/>
+  <path d="M60 184 L108 128 L148 156 L196 76" fill="none" stroke="#D7FF69" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="60" cy="184" r="20" fill="#F3F0E6"/>
+  <circle cx="108" cy="128" r="20" fill="#F3F0E6"/>
+  <circle cx="148" cy="156" r="20" fill="#F3F0E6"/>
+  <circle cx="196" cy="76" r="26" fill="#D7FF69"/>
+</svg>

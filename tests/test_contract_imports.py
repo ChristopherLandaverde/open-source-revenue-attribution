@@ -335,6 +335,15 @@ def test_without_a_cap_only_touches_after_every_conversion_warn():
     assert "After every conversion" in report.warnings[0].message
 
 
+def test_outside_window_messages_quote_the_contact_once():
+    # v0.1.0 walkthrough: the message read "contact 'con-nw-raj''s opportunities".
+    after = run(touchpoints={"occurred_at": "2026-07-01T00:00:00Z"}).warnings[0].message
+    capped = run(lookback_days=90, touchpoints={"occurred_at": "2025-12-31T12:00:00Z"})
+    for message in (after, capped.warnings[0].message):
+        assert "''s" not in message
+        assert message.endswith("of contact 'con-1'.")
+
+
 def test_touchpoint_inside_only_the_won_window_does_not_warn():
     report = run(touchpoints={"occurred_at": "2026-04-20T12:00:00Z"})
     assert report.warnings == []

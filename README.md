@@ -1,44 +1,46 @@
-# Open Source Revenue Attribution
+<p align="center">
+  <img src="docs/media/logo-256.png" width="96" height="96" alt="Open Source Revenue Attribution logo: a lime revenue line rising through three touch points on a dark green rounded tile">
+</p>
 
-**Trace closed-won revenue back to the touches behind it, and check every step of the math.**
+<h1 align="center">Open Source Revenue Attribution</h1>
 
-[![CI](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/actions/workflows/ci.yml/badge.svg)](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <strong>Trace closed-won revenue back to the touches behind it, and check every step of the math.</strong>
+</p>
 
-[Quick start](#quick-start) · [What works today](#what-works-today) · [Known limits](#known-limits) · [How it works](docs/how-it-works.md) · [Self-hosting](docs/self-hosting.md) · [Data contract](docs/contract.md)
+<p align="center">
+  5 named models side by side · 7 data-readiness checks · 21 reason codes for refused rows · self-hostable with Docker Compose and PostgreSQL 17
+</p>
+
+<p align="center">
+  <a href="https://github.com/ChristopherLandaverde/open-source-revenue-attribution/actions/workflows/ci.yml"><img src="https://github.com/ChristopherLandaverde/open-source-revenue-attribution/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/ChristopherLandaverde/open-source-revenue-attribution?color=10231F" alt="License: MIT"></a>
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick start</a> · <a href="#what-you-get">What you get</a> · <a href="#known-limits">Known limits</a> · <a href="docs/how-it-works.md">How it works</a> · <a href="docs/self-hosting.md">Self-hosting</a> · <a href="docs/contract.md">Data contract</a>
+</p>
+
+Open Source Revenue Attribution is a self-hostable app for B2B marketers, founders and RevOps
+analysts who have to explain which campaigns are associated with pipeline and won revenue, and
+defend the number. It shows the whole chain: CSV row or event → validated record → contact →
+eligible journey → named model → credit that adds up to the deal amount.
 
 On the bundled synthetic sample, `google / cpc / q1-search` gets **39000.00 USD** of the
 54000.00 USD pipeline under first-touch and **0** under last-touch. `linkedin / paid-social /
 abm-launch` gets the reverse. Same touches; only the named model changed.
 
-Ask a B2B team which campaigns are behind last quarter's closed-won revenue and the answer
-usually comes from a tool that won't show its work. Nobody can see which touches counted, which
-were dropped and why, or which rule split the deal. So budget moves on a number nobody can audit.
-And as the sample shows, the model choice alone can move a campaign from all of a deal's credit
-to none.
+That number usually comes from a tool that won't show its work: which touches counted, which
+were dropped and why, which rule split the deal. So budget moves on a number nobody can audit,
+even though the model choice alone can move a campaign from all of a deal's credit to none.
+Attribution here is a
+reporting model: it shows association under a named rule and window, not causal impact or
+incrementality.
 
-Open Source Revenue Attribution is a self-hostable app that shows the whole chain for every
-number: source event or CSV row → validated record → account and contact → eligible journey →
-named model → credit that adds up to the deal amount. Attribution here is a reporting model: it
-shows association under a named rule and window, not causal impact or incrementality.
-
-<img src="docs/media/proof.gif" width="880" alt="Five captioned frames from the running app on the bundled synthetic demo data. 1: the Import CSV page with accounts.csv, contacts.csv, opportunities.csv and touchpoints.csv chosen. 2: Data validation: 10 rows refused, the other 32 rows loaded, rows by file, and the first refused row with its reason code INVALID_ID and how to fix it. 3: the journey of opportunity Northwind platform: three touches in time order, two eligible and one after the conversion, with credit under first-touch, last-touch, linear, position-based and time decay, each column totalling 24000.00 USD. 4: the model comparison's USD table: google / cpc / q1-search gets 39000.00 under first-touch and 0 under last-touch, linkedin / paid-social / abm-launch the reverse, every column totalling 54000.00, plus an Influenced column marked as overlapping. 5: Data readiness: Fix data first, 3 checks need a fix, the first being 5 of 6 opportunities have a contact, with why, fix and how to verify.">
-
-<sub>Recorded with Playwright from the running app on `sample_data/demo/` (synthetic, `*.example` domains). The captions are added for the recording.</sub>
-
-## Who it's for
-
-- **Marketers and founders at small B2B companies** who have to explain which campaigns are associated with pipeline and won revenue, and defend the number.
-- **RevOps and agency analysts** who need to see why a touch counted or didn't before they report on it.
-- **Teams that want their data on their own server**, with a data contract they can read instead of a black box.
-
-## What you get
-
-- **Every number traced to its source.** Open any opportunity to see each touch of its contact, why it is or isn't eligible, and what each model gives it.
-- **Five named models, side by side.** First-touch, last-touch, linear, position-based (U-shaped) and time decay, each with its rule and the vendor definition it follows (Dreamdata, GA4, HockeyStack). Every column adds up to the deal amount.
-- **Bad data refused, not silently counted.** Imports and events are checked against a [documented contract](docs/contract.md). Each refused row gets a reason code and a fix.
-- **A readiness check before you trust it.** 7 data checks with counts, each failing one with a fix, a way to verify it, and the affected records.
-- **Pipeline and won revenue.** Credited at opportunity creation and at close; currencies are reported side by side, never summed.
+<p align="center">
+  <img src="docs/media/proof.gif" width="880" alt="Four storyboard frames on a dark green stage, each with a step counter and a headline. 1 of 4: the bundled synthetic sample, 4 CSVs and 43 rows, 10 of them invalid on purpose; an excerpt of sample_data/demo/touchpoints.csv with the q1-search rows (tp-01, tp-07) and abm-launch rows (tp-02, tp-08) highlighted, beside the Data validation page after Import the demo data set: 10 rows refused, the other 32 loaded, rows by file. 2 of 4: the model comparison's USD table; google / cpc / q1-search gets 39000.00 of 54000.00 USD under first-touch and 0 under last-touch, linkedin / paid-social / abm-launch the reverse; every model column totals 54000.00. 3 of 4: the journey of Northwind platform, touch by touch: tp-01 gets 24000.00 under first-touch and 0.00 under last-touch, tp-02 the reverse, tp-03 came after the conversion and gets no credit; each column adds up to 24000.00 USD. 4 of 4: opportunities.csv row 5, opp-104, has an empty contact_id, beside Data readiness: 3 checks need a fix, the first being 5 of 6 opportunities have a contact, with why, fix, how to verify and the record opp-104.">
+  <br><sub>Built by <a href="scripts/readme-demo/">scripts/readme-demo/</a> from the running app on <code>sample_data/demo/</code> (synthetic, <code>*.example</code> domains). Every number in the captions is read from the app during the run.</sub>
+</p>
 
 ## Quick start
 
@@ -81,6 +83,20 @@ uv run python manage.py migrate
 
 To run it on a server (Docker Compose with PostgreSQL 17 behind your own TLS proxy), follow the
 [self-hosting guide](docs/self-hosting.md).
+
+## What you get
+
+- **Every number traced to its source.** Open any opportunity to see each touch of its contact, why it is or isn't eligible, and what each model gives it.
+- **Five named models, side by side.** First-touch, last-touch, linear, position-based (U-shaped) and time decay, each with its rule and the vendor definition it follows (Dreamdata, GA4, HockeyStack). Every column adds up to the deal amount.
+- **Bad data refused, not silently counted.** Imports and events are checked against a [documented contract](docs/contract.md). Each refused row gets a reason code and a fix.
+- **A readiness check before you trust it.** 7 data checks with counts, each failing one with a fix, a way to verify it, and the affected records.
+- **Pipeline and won revenue.** Credited at opportunity creation and at close; currencies are reported side by side, never summed.
+
+## Who it's for
+
+- **Marketers and founders at small B2B companies** who have to explain which campaigns are associated with pipeline and won revenue, and defend the number.
+- **RevOps and agency analysts** who need to see why a touch counted or didn't before they report on it.
+- **Teams that want their data on their own server**, with a data contract they can read instead of a black box.
 
 ## What works today
 
@@ -126,8 +142,10 @@ Details for every row: [docs/how-it-works.md](docs/how-it-works.md).
 ## Status
 
 Milestones M0 to M5 are on `main`. v0.1.0 is prepared in [CHANGELOG.md](CHANGELOG.md) but not
-tagged or released, and the repository is private for now, so the clone URL works for
-collaborators only. Milestones: [docs/project-management-plan.md](docs/project-management-plan.md).
+tagged or released, and no Docker image or package is published: run it from a clone. The
+v0.1.0 browser walkthrough is in
+[docs/reviews/2026-10-30-v0.1.0-walkthrough.md](docs/reviews/2026-10-30-v0.1.0-walkthrough.md).
+Milestones: [docs/project-management-plan.md](docs/project-management-plan.md).
 
 ## Development
 

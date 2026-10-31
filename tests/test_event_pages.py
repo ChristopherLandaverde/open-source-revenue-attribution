@@ -53,6 +53,22 @@ def test_events_page_shows_outcomes(client, workspace):
     assert "skew-corrected" in html and "browser clock" in html  # evt-07, evt-12
 
 
+def test_one_touchpoint_reads_as_a_sentence(client, workspace):
+    # v0.1.0 walkthrough: one touchpoint rendered as "1 became touchpoint".
+    client.post("/import/", {"action": "demo"})
+    page_view = next(e for e in json.loads(BATCH)["batch"] if e["messageId"] == "evt-03")
+    key = base64.b64encode(b"test-write-key-0123456789:").decode()
+    client.post(
+        "/v1/batch",
+        json.dumps({"batch": [page_view]}),
+        content_type="application/json",
+        HTTP_AUTHORIZATION=f"Basic {key}",
+    )
+    html = client.get("/events/").content.decode()
+    assert "1 became a touchpoint, one per session" in html
+    assert "became touchpoint," not in html
+
+
 def test_demo_page_is_off_without_debug(client, settings, workspace):
     settings.COLLECT_DEMO_PAGE = False
     assert client.get("/events/demo/").status_code == 404
