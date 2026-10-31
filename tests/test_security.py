@@ -2,6 +2,8 @@
 
 import base64
 import json
+import re
+from pathlib import Path
 
 import pytest
 from django.core.checks import WARNING, run_checks
@@ -14,6 +16,8 @@ pytestmark = pytest.mark.django_db
 KEY = "test-write-key-0123456789"
 ALLOWED = "https://www.acme.example"
 OTHER = "https://evil.example"
+ROOT = Path(__file__).resolve().parent.parent
+SDK_FILE = "rudderstack-analytics-js-3.35.0.bundled.umd.js"
 
 PAGES = [
     "/",
@@ -200,6 +204,46 @@ def test_allowed_origin_gets_preflight_and_cors_headers(anon_client, workspace, 
     assert response.status_code == 200
     assert response.json()["accepted"] == 1
     assert response["Access-Control-Allow-Origin"] == ALLOWED
+
+
+def _sdk_request_headers() -> set[str]:
+    """Header names the vendored RudderStack SDK sets on its event requests."""
+    sdk = (ROOT / "static" / "vendor" / SDK_FILE).read_text(encoding="utf-8")
+    names = set(re.findall(r"headers\['(Rsa-[A-Za-z-]+)'\]", sdk))
+    names |= set(re.findall(r"headers\.([A-Z][A-Za-z]+)=", sdk))
+    names |= set(re.findall(r"const headers=\{[^}]*?\b([A-Z][A-Za-z]+):", sdk))
+    return {"Authorization", "Content-Type", *names}
+
+
+def test_preflight_allows_every_header_the_sdk_sends(anon_client, workspace):
+    """Cross-origin SDK delivery: rudder-server allows any request header (rs/cors "*").
+
+    SDK 3.35.0 adds SentAt on every request and Rsa-Retry-*/Rsa-Since-* on retries; a preflight
+    that refuses one of them blocks the event in the browser before it is sent.
+    """
+    sdk_headers = _sdk_request_headers()
+    assert {"AnonymousId", "SentAt", "Rsa-Retry-Attempt", "Rsa-Since-Last-Attempt"} <= sdk_headers
+    requested = ",".join(sorted(h.lower() for h in sdk_headers))
+    preflight = anon_client.options(
+        "/v1/page",
+        HTTP_ORIGIN=OTHER,
+        HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+        HTTP_ACCESS_CONTROL_REQUEST_HEADERS=requested,
+    )
+    assert preflight.status_code == 204
+    allowed = {h.strip() for h in preflight["Access-Control-Allow-Headers"].lower().split(",")}
+    assert {h.lower() for h in sdk_headers} <= allowed
+    assert "Access-Control-Request-Headers" in preflight["Vary"]
+
+
+def test_preflight_echoes_only_valid_header_names(anon_client, workspace):
+    preflight = anon_client.options(
+        "/v1/batch",
+        HTTP_ORIGIN=OTHER,
+        HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+        HTTP_ACCESS_CONTROL_REQUEST_HEADERS="authorization, bad header, x-ok",
+    )
+    assert preflight["Access-Control-Allow-Headers"] == "authorization, x-ok"
 
 
 def test_allowed_origin_still_needs_a_write_key(anon_client, workspace, settings):
