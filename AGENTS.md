@@ -67,8 +67,7 @@ no React/Vite) · Django ORM + migrations on PostgreSQL · pytest + pytest-djang
   exactly; upgrade it on purpose. New tools are read-only and go through the API.
 - **HubSpot import:** `reports/hubspot.py` is GET-only against api.hubapi.com, `/crm/` paths
   plus exactly `/account-info/2026-09/details`, no redirects (`tests/test_hubspot_import.py`
-  fails on any other request) and maps HubSpot records to the
-  CSV contract's rows. It never adds a parallel validation or load path: `run_import` loads.
+  fails on any other request) and maps HubSpot records to the CSV contract's rows. It never adds a parallel validation or load path: `run_import` loads.
   Its tests use synthetic responses in HubSpot's documented shapes, never real portal data.
 - **API:** `/api/v1/` is read-only (GET and HEAD; other methods 405) and only reshapes what
   the `reports` functions return for the matching page; a test compares each endpoint with its

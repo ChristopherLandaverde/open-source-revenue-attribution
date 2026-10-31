@@ -556,7 +556,9 @@ def test_loaded_deal_now_closed_lost_is_reported_and_kept(client, fake):
 
     page = client.get("/validation/").content.decode()
     assert "Import notes" in page and "still count as open pipeline (9102)" in page
-    assert "nothing to change in HubSpot" in page and "Fix them in HubSpot" in page
+    assert "nothing to change in HubSpot" in page
+    assert "Fix what you can in HubSpot and import again; some rows need no change there" in page
+    assert "Fix them in the CSV" not in page
 
     dry, _ = run(dry_run=True)
     assert expected in dry
@@ -609,3 +611,27 @@ def test_a_redirect_is_a_clear_error(fake):
     with pytest.raises(CommandError, match=r"redirected .*not followed.*api\.hubapi\.com"):
         run()
     assert len(fake.requests) == 1
+
+
+def test_a_403_on_account_details_asks_for_currency_not_scopes(fake, monkeypatch):
+    without_currency(fake, "9101")
+    real = fake.__call__
+
+    def refuse_account_info(request, timeout=None):
+        if "/account-info/" in request.full_url:
+            fake.failures = [(403, {}, {"message": "synthetic forbidden"})]
+        return real(request, timeout)
+
+    monkeypatch.setattr(hubspot, "urlopen", refuse_account_info)
+    with pytest.raises(CommandError) as error:
+        run()
+    message = str(error.value)
+    assert "Pass --currency <code>" in message and "crm.objects" not in message
+    assert not ImportRun.objects.exists()
+
+
+def test_contactless_hubspot_deal_gets_the_hubspot_fix(client, fake):
+    run()  # 9104 has no contact, 9109's contacts are at another company
+    page = client.get("/validation/", {"show": "warnings"}).content.decode()
+    assert "OPPORTUNITY_WITHOUT_CONTACT" in page
+    assert "Associate a contact from the deal&#x27;s company with the deal in HubSpot" in page

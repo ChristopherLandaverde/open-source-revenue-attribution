@@ -14,6 +14,9 @@ HUBSPOT_FIXES: dict[str, str] = {
         "Closed-lost deals aren't supported yet; nothing to change in HubSpot. Tracked in "
         "issue #22."
     ),
+    W.OPPORTUNITY_WITHOUT_CONTACT: (
+        "Associate a contact from the deal's company with the deal in HubSpot, then import again."
+    ),
 }
 
 FIXES: dict[str, str] = {

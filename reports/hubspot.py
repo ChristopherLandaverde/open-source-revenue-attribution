@@ -164,6 +164,12 @@ def _explain(status: int, message: str, path: str) -> str:
             "HubSpot refused the token (401). Check HUBSPOT_TOKEN: it must be a service key or "
             f"private app access token for this portal.{detail}"
         )
+    if status == 403 and path == ACCOUNT_DETAILS_PATH:
+        return (
+            "HubSpot refused to read the portal's company currency (403), which deals without "
+            "a currency need. Pass --currency <code> (for example --currency USD) to set it "
+            f"yourself.{detail}"
+        )
     if status == 403:
         return (
             f"HubSpot refused access to {path} (403). The token needs the read scopes "

@@ -19,7 +19,7 @@
   {% elif t.refused_rows or t.file_errors %}
     <p class="verdict"><span class="tag tag-refused">× Refused</span>
       {{ t.refused_rows }} row{{ t.refused_rows|pluralize }} refused{% if t.file_errors %}, {{ t.file_errors }} file error{{ t.file_errors|pluralize }}{% endif %}. The other {{ t.accepted }} rows were loaded.</p>
-    <p class="context">Refused rows are not in any report. Fix them {% if view.from_hubspot %}in HubSpot{% else %}in the CSV{% endif %} and import again.</p>
+    <p class="context">Refused rows are not in any report. {% if view.from_hubspot %}Fix what you can in HubSpot and import again; some rows need no change there (see each row's fix).{% else %}Fix them in the CSV and import again.{% endif %}</p>
   {% else %}
     <p class="verdict"><span class="tag tag-accepted">✓ Accepted</span>
       All {{ t.accepted }} rows were accepted and loaded.</p>
