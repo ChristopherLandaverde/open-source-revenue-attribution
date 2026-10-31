@@ -1,6 +1,7 @@
 import base64
 import binascii
 import json
+import re
 from collections import Counter
 
 from django.conf import settings
@@ -53,11 +54,19 @@ def _write_key(request) -> str:
     return decoded.partition(":")[0]
 
 
-# What a browser may send cross-origin: the RudderStack SDK posts JSON with the write key in
-# Authorization and the base64 anonymousId in an AnonymousId header. No cookies are involved,
-# so Access-Control-Allow-Credentials is never sent.
-CORS_ALLOW_HEADERS = "Authorization, Content-Type, AnonymousId"
+# What a browser may send cross-origin. The RudderStack SDK posts JSON with the write key in
+# Authorization, the base64 anonymousId in AnonymousId, SentAt on every request and
+# Rsa-Retry-*/Rsa-Since-* on retries; versions add headers. rudder-server allows any request
+# header (rs/cors AllowedHeaders "*", which echoes the requested names), so the preflight does
+# the same: it echoes every well-formed name the browser asks for, and falls back to the list
+# below when none is asked. No cookies are involved, so Access-Control-Allow-Credentials is
+# never sent.
+CORS_ALLOW_HEADERS = (
+    "Authorization, Content-Type, AnonymousId, SentAt, Rsa-Recovered, Rsa-Retry-Attempt, "
+    "Rsa-Since-Last-Attempt, Rsa-Since-First-Attempt, Rsa-Retry-Reason"
+)
 CORS_MAX_AGE = "86400"
+HEADER_NAME = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+")  # an RFC 9110 token
 
 
 def _origin_allowed(request, origin: str) -> bool:
@@ -66,6 +75,17 @@ def _origin_allowed(request, origin: str) -> bool:
         return True
     allowed = settings.COLLECT_ALLOWED_ORIGINS
     return "*" in allowed or origin.rstrip("/") in {o.rstrip("/") for o in allowed}
+
+
+def _allowed_request_headers(request) -> str:
+    """Validate and echo a bounded header list, or use the fixed SDK-compatible list."""
+    requested = request.headers.get("Access-Control-Request-Headers", "")
+    if not requested or len(requested) > 1024:
+        return CORS_ALLOW_HEADERS
+    names = [name.strip() for name in requested.split(",")]
+    if len(names) > 20 or any(not HEADER_NAME.fullmatch(name) for name in names):
+        return CORS_ALLOW_HEADERS
+    return ", ".join(dict.fromkeys(name.lower() for name in names))
 
 
 def _with_cors(response: HttpResponse, origin: str) -> HttpResponse:
@@ -105,8 +125,9 @@ def collect(request, kind: str):
         if origin:
             _with_cors(response, origin)
             response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-            response["Access-Control-Allow-Headers"] = CORS_ALLOW_HEADERS
+            response["Access-Control-Allow-Headers"] = _allowed_request_headers(request)
             response["Access-Control-Max-Age"] = CORS_MAX_AGE
+            patch_vary_headers(response, ["Access-Control-Request-Headers"])
         return response
     response = _collect(request, kind)
     return _with_cors(response, origin) if origin else response

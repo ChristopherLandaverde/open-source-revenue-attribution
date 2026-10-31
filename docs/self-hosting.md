@@ -20,11 +20,12 @@ Not yet tried on a public domain with a real Let's Encrypt certificate.
 3. [Create the first admin](#create-the-first-admin)
 4. [Reverse proxy and TLS](#reverse-proxy-and-tls)
 5. [Send events from your site](#send-events-from-your-site)
-6. [Configuration reference](#configuration-reference)
-7. [Security checklist](#security-checklist)
-8. [Backups and restore](#backups-and-restore)
-9. [Upgrades and migrations](#upgrades-and-migrations)
-10. [Troubleshooting](#troubleshooting)
+6. [Forward from an existing RudderStack setup](#forward-from-an-existing-rudderstack-setup)
+7. [Configuration reference](#configuration-reference)
+8. [Security checklist](#security-checklist)
+9. [Backups and restore](#backups-and-restore)
+10. [Upgrades and migrations](#upgrades-and-migrations)
+11. [Troubleshooting](#troubleshooting)
 
 ## Requirements
 
@@ -145,10 +146,34 @@ docker compose -f compose.production.yml exec app python manage.py create_worksp
 # Write key: <key>
 ```
 
-Load the RudderStack JavaScript SDK on your site with that write key and
-`dataPlaneUrl: "https://attribution.acme.example"`. Events go to `/v1/batch` (also `/v1/page`,
-`/v1/track`, `/v1/identify`). The rules for what is accepted are in
-[contract.md](contract.md), section 3.
+Load the RudderStack JavaScript SDK (3.35.0, the version in `static/vendor/`) on your site with
+that write key and your server's URL as the data plane URL:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@rudderstack/analytics-js@3.35.0/dist/npm/modern/bundled/umd/index.js"></script>
+<script>
+  const osra = new window.rudderanalytics.RudderAnalytics();
+  osra.load("<write key>", "https://attribution.acme.example", {
+    // This server is not a RudderStack control plane: give the SDK its source config here.
+    getSourceConfig: () => ({
+      source: { id: "osra", name: "OSRA", enabled: true, config: {}, destinations: [] },
+    }),
+  });
+  osra.page();
+</script>
+```
+
+Keep `getSourceConfig`. Without it the SDK first fetches its configuration from
+`https://api.rudderstack.com` with your write key, gets an error, and sends nothing. The script
+URL is the same file as `static/vendor/rudderstack-analytics-js-3.35.0.bundled.umd.js`
+(SHA-256 in `static/vendor/README.md`); you can serve your own copy instead. When a visitor
+becomes a known contact, call `osra.identify("<contact_id>")`: only an identify
+links earlier anonymous page views to a contact.
+
+Events go to `/v1/page`, `/v1/track` and `/v1/identify` (or `/v1/batch`). The rules for what
+is accepted are in [contract.md](contract.md), section 3. Checked 2026-10-30 with this snippet
+on a page served from another origin: the page view was accepted
+([research](research/rudderstack-forwarding.md#1-the-javascript-sdk-and-a-custom-data-plane)).
 
 **Allowed origins.** By default, `/v1/` accepts browser events from pages on any site, as
 Plausible, Umami and PostHog do (`COLLECT_ALLOWED_ORIGINS=*`). Your site works with no extra
@@ -176,6 +201,53 @@ curl -si -X OPTIONS https://attribution.acme.example/v1/batch \
   -H 'Origin: https://www.acme.example' -H 'Access-Control-Request-Method: POST' | head -1
 # HTTP/2 204    (allowed)      HTTP/2 403    (a list is set and this origin is not on it)
 ```
+
+## Forward from an existing RudderStack setup
+
+If your site already sends events to RudderStack (RudderStack Cloud or a self-hosted
+`rudder-server`), you can forward them here with a destination instead of adding a second SDK.
+These steps follow RudderStack's destination docs and code, and the documented payloads are
+tested against this server (`tests/test_rudderstack_forwarding.py`). They have **not yet been
+run from a live RudderStack workspace**. Research and sources:
+[research/rudderstack-forwarding.md](research/rudderstack-forwarding.md).
+
+1. Create a workspace for RudderStack and encode its write key for a Basic auth header:
+
+   ```sh
+   docker compose -f compose.production.yml exec app python manage.py create_workspace rudderstack
+   # Write key: <key>
+   printf '%s:' '<key>' | base64       # the key, a colon, nothing after it
+   ```
+
+2. In RudderStack, connect your source to a new **Webhook** destination:
+
+   | Setting | Value |
+   |---|---|
+   | Webhook URL | `https://attribution.acme.example/v1/track` |
+   | URL Method | `POST` |
+   | Headers | Key `Authorization`, value `Basic <the base64 from step 1>` |
+
+   Or use the **HTTP Webhook** destination: Base URL as above, Authentication **Basic Auth**
+   with Username = the write key (not base64; the password is ignored), Method `POST`, Body Format
+   `JSON`, **Send the event payload as is** on, and **Enable Batching off**. With batching on,
+   RudderStack sends a bare JSON array, which this server does not accept yet
+   ([issue #16](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/16)).
+
+3. Send a few events, then open **Events**. Delivery errors show in the destination's
+   **Live Events** tab in RudderStack.
+
+What to expect:
+
+- One URL takes every event type: the event's own `type` decides, not the path, so `/v1/track`
+  also takes page and identify events.
+- Event time is the `timestamp` RudderStack sets on every event, used as is.
+- `userId` is read as a `contact_id`. One that isn't a valid ID, such as an email address, is
+  refused with `INVALID_ID`. A valid ID that isn't an imported contact is kept and becomes a
+  touchpoint after the import that adds it ([contract §3](contract.md#3-events-rudderstack)).
+- `COLLECT_ALLOWED_ORIGINS` doesn't apply: RudderStack's servers send no `Origin` header, so
+  only the write key is checked.
+- Each request carries one event, and every request recomputes touchpoints (README, Known
+  limits). That is fine at small volumes.
 
 ## Configuration reference
 

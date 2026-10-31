@@ -2,6 +2,8 @@
 
 import base64
 import json
+import re
+from pathlib import Path
 
 import pytest
 from django.core.checks import WARNING, run_checks
@@ -14,6 +16,8 @@ pytestmark = pytest.mark.django_db
 KEY = "test-write-key-0123456789"
 ALLOWED = "https://www.acme.example"
 OTHER = "https://evil.example"
+ROOT = Path(__file__).resolve().parent.parent
+SDK_FILE = "rudderstack-analytics-js-3.35.0.bundled.umd.js"
 
 PAGES = [
     "/",
@@ -202,6 +206,71 @@ def test_allowed_origin_gets_preflight_and_cors_headers(anon_client, workspace, 
     assert response["Access-Control-Allow-Origin"] == ALLOWED
 
 
+def _sdk_request_headers() -> set[str]:
+    """Header names the vendored RudderStack SDK sets on its event requests."""
+    sdk = (ROOT / "static" / "vendor" / SDK_FILE).read_text(encoding="utf-8")
+    names = set(re.findall(r"headers\['(Rsa-[A-Za-z-]+)'\]", sdk))
+    names |= set(re.findall(r"headers\.([A-Z][A-Za-z]+)=", sdk))
+    names |= set(re.findall(r"const headers=\{[^}]*?\b([A-Z][A-Za-z]+):", sdk))
+    return {"Authorization", "Content-Type", *names}
+
+
+def test_preflight_allows_every_header_the_sdk_sends(anon_client, workspace):
+    """Cross-origin SDK delivery: rudder-server allows any request header (rs/cors "*").
+
+    SDK 3.35.0 adds SentAt on every request and Rsa-Retry-*/Rsa-Since-* on retries; a preflight
+    that refuses one of them blocks the event in the browser before it is sent.
+    """
+    sdk_headers = _sdk_request_headers()
+    assert {"AnonymousId", "SentAt", "Rsa-Retry-Attempt", "Rsa-Since-Last-Attempt"} <= sdk_headers
+    requested = ",".join(sorted(h.lower() for h in sdk_headers))
+    preflight = anon_client.options(
+        "/v1/page",
+        HTTP_ORIGIN=OTHER,
+        HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+        HTTP_ACCESS_CONTROL_REQUEST_HEADERS=requested,
+    )
+    assert preflight.status_code == 204
+    allowed = {h.strip() for h in preflight["Access-Control-Allow-Headers"].lower().split(",")}
+    assert {h.lower() for h in sdk_headers} <= allowed
+    assert "Access-Control-Request-Headers" in preflight["Vary"]
+
+
+def _safe_cors_headers() -> str:
+    return (
+        "authorization, content-type, anonymousid, sentat, rsa-recovered, rsa-retry-attempt, "
+        "rsa-since-last-attempt, rsa-since-first-attempt, rsa-retry-reason"
+    )
+
+
+@pytest.mark.parametrize(
+    "requested",
+    [
+        "x-" + "a" * 1023,
+        ",".join(f"x-{i}" for i in range(21)),
+        "x-ok, bad header",
+        "x-ok, x-good\r\nx-evil",
+    ],
+)
+def test_preflight_invalid_or_oversized_headers_use_safe_list(anon_client, workspace, requested):
+    preflight = anon_client.options(
+        "/v1/batch",
+        HTTP_ORIGIN=OTHER,
+        HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+        HTTP_ACCESS_CONTROL_REQUEST_HEADERS=requested,
+    )
+    assert preflight["Access-Control-Allow-Headers"].lower() == _safe_cors_headers()
+
+
+def test_preflight_valid_headers_are_lowercased_and_deduplicated(anon_client, workspace):
+    preflight = anon_client.options(
+        "/v1/batch",
+        HTTP_ORIGIN=OTHER,
+        HTTP_ACCESS_CONTROL_REQUEST_HEADERS="X-One, authorization, x-one, CONTENT-TYPE",
+    )
+    assert preflight["Access-Control-Allow-Headers"] == "x-one, authorization, content-type"
+
+
 def test_allowed_origin_still_needs_a_write_key(anon_client, workspace, settings):
     settings.COLLECT_ALLOWED_ORIGINS = [ALLOWED]
     response = send(anon_client, HTTP_ORIGIN=ALLOWED, **auth("wrong-key-0123456789"))
@@ -212,7 +281,14 @@ def test_allowed_origin_still_needs_a_write_key(anon_client, workspace, settings
 
 def test_unlisted_origin_is_refused_when_others_are_allowed(anon_client, workspace, settings):
     settings.COLLECT_ALLOWED_ORIGINS = [ALLOWED]
-    assert anon_client.options("/v1/batch", HTTP_ORIGIN=OTHER).status_code == 403
+    preflight = anon_client.options(
+        "/v1/batch",
+        HTTP_ORIGIN=OTHER,
+        HTTP_ACCESS_CONTROL_REQUEST_HEADERS="authorization, content-type",
+    )
+    assert preflight.status_code == 403
+    assert "Access-Control-Allow-Origin" not in preflight
+    assert "Access-Control-Allow-Headers" not in preflight
     response = send(anon_client, HTTP_ORIGIN=OTHER, **auth())
     assert response.status_code == 403
     assert "Access-Control-Allow-Origin" not in response

@@ -2,6 +2,21 @@
 
 Product and data-meaning decisions, newest first. Each links the issue where it was made.
 
+## 2026-10-30 — CORS request headers on `/v1/` (proposed in PR, for Christopher's review)
+
+Proposed by Claude under the standing rule (adopt the industry standard or argue a deviation).
+Research and sources: [research/rudderstack-forwarding.md](research/rudderstack-forwarding.md).
+Branch `docs/rudderstack-front-and-center`.
+
+**Adopted from the standard** (rudder-server: rs/cors with `AllowedHeaders: ["*"]`, which
+echoes the requested names): the `/v1/` preflight allows every well-formed header name the
+browser asks for. The M5 list (`Authorization, Content-Type, AnonymousId`) refused the
+RudderStack SDK's own `SentAt` and `Rsa-*` retry headers, so pages on other sites could not
+send events. The M5 deviations stay: origins can be restricted, the origin is echoed rather
+than `*`, and `Access-Control-Allow-Credentials` is never sent. Batched forwarding from the
+HTTP Webhook destination (a bare JSON array) changes the collection contract and is open in
+[#16](https://github.com/ChristopherLandaverde/open-source-revenue-attribution/issues/16).
+
 ## 2026-10-29 — M5 self-hosting, sign-in and allowed origins
 
 Decided by Claude under Christopher's standing rule (adopt the industry standard or argue for
